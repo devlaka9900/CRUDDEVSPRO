@@ -1,0 +1,2050 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hard-Code a PyQt6 + SQLite Todo CRUD App</title>
+<meta name="description" content="A senior engineer's step-by-step guide: build a layered PyQt6 + SQLite Todo CRUD app by hand in 14 git commits.">
+<style>
+:root {
+  --bg: #f6f6f3;
+  --surface: #ffffff;
+  --surface-2: #efefea;
+  --text: #1d1f27;
+  --muted: #5d6170;
+  --border: #dcdcd4;
+  --accent: #4338ca;
+  --accent-soft: #e8e7fb;
+  --ok: #176f45;
+  --ok-soft: #e1f3ea;
+  --warn: #9a5b00;
+  --warn-soft: #fbefd5;
+  --bad: #b3261e;
+  --bad-soft: #fbe5e3;
+  --info: #1b5fa8;
+  --info-soft: #e1edf9;
+  --code-bg: #14161f;
+  --code-bar: #1f2230;
+  --code-text: #e6e8f2;
+  --tok-k: #c4a1ff;
+  --tok-s: #9bd6a0;
+  --tok-c: #7d849c;
+  --tok-n: #f2b880;
+  --tok-f: #7fb8ff;
+  --tok-b: #f08fa8;
+  --radius: 10px;
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, Menlo, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101117; --surface: #181a22; --surface-2: #21242f; --text: #e8e9f0;
+    --muted: #a0a4b5; --border: #2d3040; --accent: #a5b0ff; --accent-soft: #272a4a;
+    --ok: #6fd5a0; --ok-soft: #14301f; --warn: #f0be6a; --warn-soft: #382a10;
+    --bad: #ff9a92; --bad-soft: #3a1917; --info: #8fc2f5; --info-soft: #14283d;
+    --code-bg: #0b0c11; --code-bar: #171924;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101117; --surface: #181a22; --surface-2: #21242f; --text: #e8e9f0;
+  --muted: #a0a4b5; --border: #2d3040; --accent: #a5b0ff; --accent-soft: #272a4a;
+  --ok: #6fd5a0; --ok-soft: #14301f; --warn: #f0be6a; --warn-soft: #382a10;
+  --bad: #ff9a92; --bad-soft: #3a1917; --info: #8fc2f5; --info-soft: #14283d;
+  --code-bg: #0b0c11; --code-bar: #171924;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 20px; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.65 var(--sans); -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+code, kbd, pre { font-family: var(--mono); font-size: .88em; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+:not(pre) > code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: .08em .38em; border-radius: 5px; overflow-wrap: anywhere;
+}
+kbd {
+  background: var(--surface); border: 1px solid var(--border); border-bottom-width: 2px;
+  padding: .05em .4em; border-radius: 5px;
+}
+
+/* ---------- layout ---------- */
+.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 100vh; }
+.sidebar {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  padding: 22px 18px; border-right: 1px solid var(--border); background: var(--surface);
+}
+.sidebar h1 { font-size: 1rem; margin: 0 0 4px; line-height: 1.3; }
+.sidebar .sub { color: var(--muted); font-size: .82rem; margin: 0 0 16px; }
+.sidebar nav ol { list-style: none; margin: 0; padding: 0; }
+.sidebar nav a {
+  display: block; padding: 6px 10px; border-radius: 7px; text-decoration: none;
+  color: var(--muted); font-size: .9rem; border-left: 3px solid transparent;
+}
+.sidebar nav a:hover { background: var(--surface-2); color: var(--text); }
+.sidebar nav a.active { color: var(--accent); background: var(--accent-soft); border-left-color: var(--accent); font-weight: 600; }
+.sidebar nav .group { margin: 14px 10px 4px; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.progress-box { margin: 0 0 18px; }
+.bar { height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
+.bar > i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+.progress-box small { color: var(--muted); font-size: .8rem; }
+.theme-btn {
+  margin-top: 18px; width: 100%; padding: 7px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border); font: inherit; font-size: .85rem;
+}
+main { padding: 36px clamp(16px, 4vw, 56px) 80px; max-width: 1020px; width: 100%; }
+.toc-mobile { display: none; }
+
+/* ---------- typography ---------- */
+h2 { font-size: 1.7rem; line-height: 1.25; margin: 56px 0 14px; letter-spacing: -.01em; }
+h3 { font-size: 1.15rem; margin: 30px 0 8px; }
+h4 { font-size: .95rem; margin: 22px 0 6px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+p { margin: 0 0 14px; }
+ul, ol { padding-left: 1.3em; margin: 0 0 14px; }
+li { margin: 4px 0; }
+.lead { font-size: 1.12rem; color: var(--muted); }
+
+/* ---------- hero ---------- */
+.hero {
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface));
+  border: 1px solid var(--border); border-radius: 16px; padding: 30px clamp(18px, 4vw, 36px);
+}
+.hero h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); line-height: 1.15; margin: 0 0 10px; letter-spacing: -.02em; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.chip { background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 3px 12px; font-size: .84rem; }
+
+/* ---------- callouts ---------- */
+.callout { border-radius: var(--radius); padding: 12px 16px; margin: 16px 0; border: 1px solid; border-left-width: 5px; }
+.callout > :last-child { margin-bottom: 0; }
+.callout .t { display: block; font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
+.callout.why { background: var(--accent-soft); border-color: var(--accent); }
+.callout.why .t { color: var(--accent); }
+.callout.tip { background: var(--info-soft); border-color: var(--info); }
+.callout.tip .t { color: var(--info); }
+.callout.warn { background: var(--warn-soft); border-color: var(--warn); }
+.callout.warn .t { color: var(--warn); }
+.callout.verify { background: var(--ok-soft); border-color: var(--ok); }
+.callout.verify .t { color: var(--ok); }
+.callout.commit { background: var(--surface); border-color: var(--border); border-left-color: var(--text); }
+.callout.commit .t { color: var(--text); }
+.callout.check { background: var(--surface-2); border-color: var(--border); border-left-color: var(--muted); }
+.callout.check .t { color: var(--muted); }
+
+/* ---------- steps ---------- */
+.step { margin-top: 56px; padding-top: 6px; }
+.step-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.step-head h2 { margin: 0; }
+.badge {
+  flex: none; width: 46px; height: 46px; border-radius: 12px; background: var(--accent); color: var(--bg);
+  display: grid; place-items: center; font-weight: 800; font-size: 1.15rem;
+}
+.step .meta { color: var(--muted); font-size: .9rem; margin: 0 0 14px 60px; }
+
+/* ---------- code ---------- */
+figure.code { margin: 18px 0; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--code-bar); background: var(--code-bg); }
+figure.code figcaption {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 14px; background: var(--code-bar);
+  color: #c9cce0; font: 600 .82rem var(--mono);
+}
+.tag { font: 600 .68rem var(--sans); text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 99px; background: #2b3050; color: #b9c2ff; }
+.tag.new { background: #1c3a2a; color: #86e0ad; }
+.tag.edit { background: #3b2e12; color: #f3c777; }
+.tag.run { background: #1f3445; color: #8fc9f5; }
+.tag.bad { background: #4a1f1f; color: #ff9a92; }
+.tag.good { background: #1c3a2a; color: #86e0ad; }
+figure.code .hint { margin-left: auto; font: .78rem var(--sans); color: #98a0bd; font-weight: 400; }
+figure.code pre { margin: 0; padding: 14px 16px; overflow-x: auto; color: var(--code-text); font: .86rem/1.55 var(--mono); tab-size: 4; }
+figure.code pre code { font: inherit; }
+.k { color: var(--tok-k); } .s { color: var(--tok-s); } .c { color: var(--tok-c); font-style: italic; }
+.n { color: var(--tok-n); } .f { color: var(--tok-f); } .b { color: var(--tok-b); }
+
+/* ---------- tree / diagram ---------- */
+pre.tree { background: var(--code-bg); color: var(--code-text); border-radius: var(--radius); padding: 16px 18px; overflow-x: auto; font: .88rem/1.6 var(--mono); border: 1px solid var(--code-bar); }
+pre.tree .c { color: var(--tok-c); font-style: normal; }
+.diagram { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin: 18px 0; }
+.diagram svg { width: 100%; height: auto; display: block; }
+.diagram text { font-family: var(--sans); fill: var(--text); }
+.diagram .box { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+.diagram .box.a { fill: var(--accent-soft); stroke: var(--accent); }
+.diagram .box.g { fill: var(--ok-soft); stroke: var(--ok); }
+.diagram .box.w { fill: var(--warn-soft); stroke: var(--warn); }
+.diagram .sm { font-size: 12px; fill: var(--muted); }
+.diagram .ln { stroke: var(--muted); stroke-width: 1.8; fill: none; marker-end: url(#arr); }
+.diagram #arr path { fill: var(--muted); }
+
+/* ---------- tables ---------- */
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--surface-2); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+
+/* ---------- checklist ---------- */
+.cl-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin: 12px 0; overflow: hidden; }
+.cl-group > header { display: flex; gap: 12px; align-items: baseline; padding: 10px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.cl-group > header b { font-family: var(--mono); font-size: .9rem; }
+.cl-group > header span { color: var(--muted); font-size: .85rem; margin-left: auto; white-space: nowrap; }
+.cl-group ul { list-style: none; margin: 0; padding: 8px 16px 12px; }
+.cl-group label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; padding: 3px 0; }
+.cl-group input { margin-top: .35em; width: 17px; height: 17px; accent-color: var(--ok); flex: none; }
+.cl-group input:checked + span { color: var(--muted); text-decoration: line-through; }
+.cl-group.done > header { background: var(--ok-soft); }
+.reset-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: .85rem; }
+
+/* ---------- misc ---------- */
+details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; margin: 14px 0; }
+details summary { cursor: pointer; font-weight: 600; }
+details[open] summary { margin-bottom: 8px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; }
+.card h4 { margin-top: 0; }
+.score { font-weight: 700; font-family: var(--mono); white-space: nowrap; }
+footer { margin-top: 70px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--muted); font-size: .88rem; }
+
+main { min-width: 0; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  main { padding-left: 16px; padding-right: 16px; }
+  .sidebar { display: none; }
+  .toc-mobile { display: block; position: sticky; top: 0; z-index: 5; margin: 0 0 18px; }
+  .toc-mobile nav a { display: block; padding: 5px 4px; text-decoration: none; }
+  .toc-mobile nav ol { list-style: none; padding: 0; margin: 0; max-height: 60vh; overflow-y: auto; }
+  .toc-mobile .group { margin: 10px 4px 2px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .two { grid-template-columns: 1fr; }
+  .step .meta { margin-left: 0; }
+  .step-head { align-items: flex-start; }
+  h2 { font-size: 1.4rem; }
+}
+@media print { .sidebar, .toc-mobile, .theme-btn { display: none; } .layout { display: block; } }
+
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>Hard-Code a CRUD App</h1>
+    <p class="sub">PyQt6 &middot; SQLite &middot; 14 commits</p>
+    <div class="progress-box">
+      <div class="bar"><i class="js-bar"></i></div>
+      <small class="js-pct">0 of 0 tasks</small>
+    </div>
+    <nav aria-label="Contents">
+<ol>
+<li class="group">Start here</li>
+<li><a href="#welcome">Welcome: what you are going to build</a></li>
+<li><a href="#rules">The ground rules</a></li>
+<li><a href="#concepts">Four ideas you need before typing</a></li>
+<li><a href="#architecture">Architecture: four layers, arrows only point down</a></li>
+<li><a href="#structure">The file structure, and why each file exists</a></li>
+<li class="group">Build it (14 commits)</li>
+<li><a href="#step-1">1. Project setup</a></li>
+<li><a href="#step-2">2. Config, connection and schema</a></li>
+<li><a href="#step-3">3. The Task model and validation</a></li>
+<li><a href="#step-4">4. Repository: Create and Read</a></li>
+<li><a href="#step-5">5. Repository: Update, Delete, Search</a></li>
+<li><a href="#step-6">6. Main window shell</a></li>
+<li><a href="#step-7">7. Read: show tasks in the table</a></li>
+<li><a href="#step-8">8. Create: the add-task dialog</a></li>
+<li><a href="#step-9">9. Update: edit a task</a></li>
+<li><a href="#step-10">10. Delete, with a confirmation</a></li>
+<li><a href="#step-11">11. Search box and status filter</a></li>
+<li><a href="#step-12">12. Style it with QSS</a></li>
+<li><a href="#step-13">13. Write the tests</a></li>
+<li><a href="#step-14">14. README and the final tidy</a></li>
+<li class="group">Finish</li>
+<li><a href="#checklist">Master checklist</a></li>
+<li><a href="#debugging">Debugging cheat sheet</a></li>
+<li><a href="#stretch">Stretch goals</a></li>
+<li><a href="#review">Review: how I will give you feedback</a></li>
+</ol>
+    </nav>
+    <button class="theme-btn" id="theme-btn" type="button">Toggle light / dark</button>
+  </aside>
+  <main>
+    <details class="toc-mobile">
+      <summary>Contents &amp; progress</summary>
+      <div class="bar" style="margin:10px 0 4px"><i class="js-bar"></i></div>
+      <small class="js-pct">0 of 0 tasks</small>
+      <nav aria-label="Contents (mobile)">
+<ol>
+<li class="group">Start here</li>
+<li><a href="#welcome">Welcome: what you are going to build</a></li>
+<li><a href="#rules">The ground rules</a></li>
+<li><a href="#concepts">Four ideas you need before typing</a></li>
+<li><a href="#architecture">Architecture: four layers, arrows only point down</a></li>
+<li><a href="#structure">The file structure, and why each file exists</a></li>
+<li class="group">Build it (14 commits)</li>
+<li><a href="#step-1">1. Project setup</a></li>
+<li><a href="#step-2">2. Config, connection and schema</a></li>
+<li><a href="#step-3">3. The Task model and validation</a></li>
+<li><a href="#step-4">4. Repository: Create and Read</a></li>
+<li><a href="#step-5">5. Repository: Update, Delete, Search</a></li>
+<li><a href="#step-6">6. Main window shell</a></li>
+<li><a href="#step-7">7. Read: show tasks in the table</a></li>
+<li><a href="#step-8">8. Create: the add-task dialog</a></li>
+<li><a href="#step-9">9. Update: edit a task</a></li>
+<li><a href="#step-10">10. Delete, with a confirmation</a></li>
+<li><a href="#step-11">11. Search box and status filter</a></li>
+<li><a href="#step-12">12. Style it with QSS</a></li>
+<li><a href="#step-13">13. Write the tests</a></li>
+<li><a href="#step-14">14. README and the final tidy</a></li>
+<li class="group">Finish</li>
+<li><a href="#checklist">Master checklist</a></li>
+<li><a href="#debugging">Debugging cheat sheet</a></li>
+<li><a href="#stretch">Stretch goals</a></li>
+<li><a href="#review">Review: how I will give you feedback</a></li>
+</ol>
+      </nav>
+    </details>
+<div class="hero">
+  <h1>Hard-code a PyQt6 + SQLite CRUD app, one commit at a time</h1>
+  <p class="lead">Your first real assignment. No generators, no ORM, no Qt Designer, no copy-paste. You type every line, you understand every line, and by the end you own a small but properly structured desktop application.</p>
+  <div class="chips">
+    <span class="chip">Python 3.11+</span>
+    <span class="chip">PyQt6</span>
+    <span class="chip">SQLite (built into Python)</span>
+    <span class="chip">Layered architecture</span>
+    <span class="chip">14 git commits</span>
+    <span class="chip">About 5&ndash;7 hours</span>
+  </div>
+</div>
+
+<h2 id="welcome">Welcome: what you are going to build</h2>
+<p>You are joining the team as a junior, and my job is to turn you into an engineer people trust with production code. The fastest way I know is to make you build something small <em>completely by hand</em>, so that nothing in it is magic.</p>
+<p>The app is a <strong>Todo manager</strong> for the desktop:</p>
+
+<div class="diagram" role="img" aria-label="Mock-up of the finished app: a search box, a status filter, Add, Edit and Delete buttons above a table of tasks">
+<svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg">
+  <rect class="box" x="8" y="8" width="744" height="254" rx="10"/>
+  <rect class="box a" x="8" y="8" width="744" height="30" rx="10"/>
+  <text x="24" y="28" font-size="13" font-weight="700">Todo Manager</text>
+  <rect class="box" x="24" y="52" width="250" height="28" rx="6"/>
+  <text class="sm" x="36" y="71">Search title or description...</text>
+  <rect class="box" x="284" y="52" width="110" height="28" rx="6"/>
+  <text class="sm" x="296" y="71">All statuses</text>
+  <rect class="box a" x="540" y="52" width="86" height="28" rx="6"/>
+  <text x="552" y="71" font-size="13" font-weight="700">+ Add task</text>
+  <rect class="box" x="634" y="52" width="48" height="28" rx="6"/>
+  <text x="645" y="71" font-size="13">Edit</text>
+  <rect class="box w" x="690" y="52" width="52" height="28" rx="6"/>
+  <text x="698" y="71" font-size="13">Delete</text>
+  <rect class="box" x="24" y="94" width="718" height="26"/>
+  <text class="sm" x="36" y="112" font-weight="700">ID</text><text class="sm" x="84" y="112" font-weight="700">Title</text>
+  <text class="sm" x="470" y="112" font-weight="700">Status</text><text class="sm" x="570" y="112" font-weight="700">Priority</text>
+  <text class="sm" x="650" y="112" font-weight="700">Due</text>
+  <rect class="box a" x="24" y="120" width="718" height="26"/>
+  <text x="36" y="138" font-size="13">3</text><text x="84" y="138" font-size="13">Hard-code a CRUD app</text>
+  <text x="470" y="138" font-size="13">In Progress</text><text x="570" y="138" font-size="13">High</text><text x="650" y="138" font-size="13">2026-12-31</text>
+  <rect class="box" x="24" y="146" width="718" height="26"/>
+  <text x="36" y="164" font-size="13">1</text><text x="84" y="164" font-size="13">Learn PyQt6</text>
+  <text x="470" y="164" font-size="13">Todo</text><text x="570" y="164" font-size="13">Medium</text><text x="650" y="164" font-size="13">-</text>
+  <rect class="box" x="24" y="172" width="718" height="26"/>
+  <text x="36" y="190" font-size="13">2</text><text x="84" y="190" font-size="13">Read the SQLite docs</text>
+  <text x="470" y="190" font-size="13">Done</text><text x="570" y="190" font-size="13">Low</text><text x="650" y="190" font-size="13">-</text>
+  <text class="sm" x="24" y="250">3 task(s)</text>
+</svg>
+</div>
+
+<ul>
+  <li><strong>Create</strong> a task in a dialog (title, description, status, priority, optional due date).</li>
+  <li><strong>Read</strong> all tasks in a table, with live search and a status filter.</li>
+  <li><strong>Update</strong> a task by double-clicking it.</li>
+  <li><strong>Delete</strong> a task, after a confirmation.</li>
+  <li>Everything is validated, saved in a database file, covered by tests, and committed in small honest steps.</li>
+</ul>
+
+<div class="callout why"><span class="t">Why hard-code?</span>
+<p>Frameworks hide the parts that make you a good engineer: where SQL lives, how data flows, how a button click becomes a database write. If you learn those by hand once, every framework you meet later (Django, SQLAlchemy, Qt Designer, web stacks) will make sense, because you will recognise what it is doing for you.</p></div>
+
+<div class="callout tip"><span class="t">About &ldquo;mysql lite&rdquo;</span>
+<p>The brief says <em>mysql lite</em>. We are using <strong>SQLite</strong>: a complete SQL database stored in a <em>single file</em>, shipped inside Python (<code>import sqlite3</code>). There is no server to install or configure. The SQL you learn here (<code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>) transfers almost unchanged to MySQL and PostgreSQL.</p></div>
+
+<h3>What you will learn</h3>
+<div class="two">
+  <div class="card"><h4>Engineering</h4>
+    <ul>
+      <li>Layered architecture and import rules</li>
+      <li>Separating data, logic and UI</li>
+      <li>Validation and error handling</li>
+      <li>Small commits with meaningful messages</li>
+      <li>Automated tests with pytest</li>
+    </ul></div>
+  <div class="card"><h4>Technology</h4>
+    <ul>
+      <li>SQL CRUD with parameterised queries</li>
+      <li>Python dataclasses and context managers</li>
+      <li>Qt widgets, layouts, dialogs</li>
+      <li>Signals and slots</li>
+      <li>Styling with QSS</li>
+    </ul></div>
+</div>
+
+<h2 id="rules">The ground rules</h2>
+<ol>
+  <li><strong>Type every character yourself.</strong> No copy-paste, no AI autocomplete. Your fingers must learn the shapes, and typos teach you to read error messages. (That is also why the code blocks in this guide have no copy button.)</li>
+  <li><strong>Read the &ldquo;Why&rdquo; box before the code.</strong> Code without a reason is cargo cult.</li>
+  <li><strong>Run it after every step.</strong> Never start a new step on top of something broken.</li>
+  <li><strong>One checklist group = one commit,</strong> with the exact message I give you. Your git history is part of your work and I will read it.</li>
+  <li><strong>Stuck for more than 15 minutes?</strong> Re-read the step, read the &ldquo;Common mistakes&rdquo; list, add a <code>print()</code>, read the <em>last line</em> of the traceback. Then come and ask me, and tell me what you already tried.</li>
+  <li><strong>Do not redesign my structure</strong> until you finish. Improvements belong in the stretch goals.</li>
+</ol>
+
+<div class="callout warn"><span class="t">Careful with old tutorials</span>
+<p>Most PyQt examples online are for <strong>PyQt5</strong>. PyQt6 changed enums to be fully qualified: <code>Qt.AlignmentFlag.AlignLeft</code> instead of <code>Qt.AlignLeft</code>, <code>QMessageBox.StandardButton.Yes</code> instead of <code>QMessageBox.Yes</code>, <code>app.exec()</code> instead of <code>app.exec_()</code>. If you see <code>AttributeError</code> mentioning an enum, this is almost certainly why.</p></div>
+
+<h2 id="concepts">Four ideas you need before typing</h2>
+
+<h3>1. CRUD is just four SQL verbs</h3>
+<div class="table-wrap"><table>
+  <tr><th>Letter</th><th>User action</th><th>SQL</th><th>Our function</th></tr>
+  <tr><td><strong>C</strong>reate</td><td>Click &ldquo;+ Add task&rdquo;</td><td><code>INSERT INTO ...</code></td><td><code>task_repo.create()</code></td></tr>
+  <tr><td><strong>R</strong>ead</td><td>Open app, search, filter</td><td><code>SELECT ... WHERE ...</code></td><td><code>task_repo.list_all()</code>, <code>get_by_id()</code></td></tr>
+  <tr><td><strong>U</strong>pdate</td><td>Double-click, edit, save</td><td><code>UPDATE ... SET ... WHERE id = ?</code></td><td><code>task_repo.update()</code></td></tr>
+  <tr><td><strong>D</strong>elete</td><td>Select, click Delete, confirm</td><td><code>DELETE FROM ... WHERE id = ?</code></td><td><code>task_repo.delete()</code></td></tr>
+</table></div>
+
+<h3>2. A database file is the source of truth</h3>
+<p>The table on screen is only a <em>view</em> of the data. Whenever something changes, we write to the database first, then reload the view from the database. If you ever find yourself editing the table widget directly to &ldquo;update&rdquo; data, stop: that way lies bugs where the screen and the database disagree.</p>
+
+<h3>3. Qt runs an event loop and talks with signals</h3>
+<p><code>app.exec()</code> starts a loop that waits for events (clicks, key presses, timers). Widgets announce what happened with <strong>signals</strong>, and you subscribe a function (a <strong>slot</strong>) with <code>.connect()</code>:</p>
+<figure class="code"><figcaption><span>example.py</span><span class="tag edit">idea only, do not type</span><span class="hint">not part of the project</span></figcaption><pre><code>button.clicked.connect(<span class="b">self</span>.add_task)   <span class="c"># when &#x27;clicked&#x27; fires, call add_task()</span></code></pre></figure>
+<p>No polling, no <code>while True</code>. You describe <em>what should happen when</em>, Qt does the waiting.</p>
+
+<h3>4. Layers: each folder has exactly one job</h3>
+<p>This is the big one, and it gets its own section next.</p>
+
+<h2 id="architecture">Architecture: four layers, arrows only point down</h2>
+
+<div class="diagram" role="img" aria-label="Layer diagram. main.py starts ui. ui calls db/task_repo and uses models/task. task_repo uses models/task and db/connection. connection opens the todo.db file. config.py is used by everyone.">
+<svg viewBox="0 0 780 450" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="box" x="250" y="14" width="260" height="46" rx="8"/>
+  <text x="380" y="42" text-anchor="middle" font-size="15" font-weight="700">main.py</text>
+  <rect class="box a" x="220" y="96" width="320" height="68" rx="8"/>
+  <text x="380" y="124" text-anchor="middle" font-size="15" font-weight="700">ui/</text>
+  <text class="sm" x="380" y="146" text-anchor="middle">main_window.py &middot; task_dialog.py &middot; styles.py</text>
+  <rect class="box g" x="100" y="208" width="250" height="68" rx="8"/>
+  <text x="225" y="236" text-anchor="middle" font-size="15" font-weight="700">db/task_repo.py</text>
+  <text class="sm" x="225" y="258" text-anchor="middle">all SQL lives here</text>
+  <rect class="box w" x="410" y="208" width="250" height="68" rx="8"/>
+  <text x="535" y="236" text-anchor="middle" font-size="15" font-weight="700">models/task.py</text>
+  <text class="sm" x="535" y="258" text-anchor="middle">Task + validate()</text>
+  <rect class="box g" x="100" y="312" width="250" height="52" rx="8"/>
+  <text x="225" y="334" text-anchor="middle" font-size="14" font-weight="700">db/connection.py</text>
+  <text class="sm" x="225" y="352" text-anchor="middle">+ schema.py</text>
+  <rect class="box" x="100" y="396" width="250" height="40" rx="8"/>
+  <text x="225" y="421" text-anchor="middle" font-size="14">todo.db (a file)</text>
+  <rect class="box" x="684" y="96" width="84" height="180" rx="8"/>
+  <text x="726" y="180" text-anchor="middle" font-size="14" font-weight="700">config.py</text>
+  <text class="sm" x="726" y="200" text-anchor="middle">constants,</text>
+  <text class="sm" x="726" y="216" text-anchor="middle">used by all</text>
+  <path class="ln" d="M380 60 L380 94"/>
+  <path class="ln" d="M300 164 L240 206"/>
+  <path class="ln" d="M460 164 L520 206"/>
+  <path class="ln" d="M352 242 L408 242"/>
+  <path class="ln" d="M225 276 L225 310"/>
+  <path class="ln" d="M225 364 L225 394"/>
+  <text class="sm" x="400" y="334">Rule of thumb: an arrow never points up.</text>
+  <text class="sm" x="400" y="354">db/ never imports ui/. models/ never imports db/ or ui/.</text>
+  <text class="sm" x="400" y="374">ui/ never contains a line of SQL.</text>
+</svg>
+</div>
+
+<div class="callout why"><span class="t">Why bother with layers in a tiny app?</span>
+<p>Use the <strong>replacement test</strong>. If your boss says &ldquo;we are moving from desktop to a web page&rdquo;, you throw away <code>ui/</code> and keep everything else. If they say &ldquo;we are moving from SQLite to PostgreSQL&rdquo;, you rewrite <code>db/</code> and keep everything else. If a change in one place forces edits in three folders, the structure is wrong. Habits formed on a 500-line app are the ones that survive on a 500,000-line one.</p></div>
+
+<h3>Who may import whom</h3>
+<div class="table-wrap"><table>
+  <tr><th>Folder</th><th>May import</th><th>Must never contain / import</th></tr>
+  <tr><td><code>main.py</code></td><td><code>ui</code>, <code>db.schema</code>, PyQt6</td><td>Business rules, SQL</td></tr>
+  <tr><td><code>ui/</code></td><td><code>db.task_repo</code>, <code>models</code>, <code>config</code>, PyQt6</td><td><strong>SQL strings</strong>, direct <code>connection()</code> calls</td></tr>
+  <tr><td><code>db/</code></td><td><code>models</code>, <code>config</code>, <code>sqlite3</code></td><td>PyQt6, anything from <code>ui</code></td></tr>
+  <tr><td><code>models/</code></td><td><code>config</code>, standard library</td><td>PyQt6, <code>sqlite3</code>, anything from <code>db</code> or <code>ui</code></td></tr>
+  <tr><td><code>config.py</code></td><td>standard library only</td><td>Everything else</td></tr>
+</table></div>
+
+<h2 id="structure">The file structure, and why each file exists</h2>
+<pre class="tree">todo_app/
+├── main.py                 <span class="c"># entry point: init DB, create QApplication, show window</span>
+├── config.py               <span class="c"># constants: DB path, statuses, priorities, window title</span>
+├── requirements.txt        <span class="c"># exact dependencies: others can rebuild your environment</span>
+├── pytest.ini              <span class="c"># tells pytest where to find our modules</span>
+├── .gitignore              <span class="c"># keeps .venv, __pycache__ and *.db out of git</span>
+├── db/
+│   ├── __init__.py         <span class="c"># empty: marks the folder as a Python package</span>
+│   ├── connection.py       <span class="c"># opens SQLite; commit / rollback / close handled once</span>
+│   ├── schema.py           <span class="c"># CREATE TABLE + init_db()</span>
+│   └── task_repo.py        <span class="c"># create / read / update / delete: ALL the SQL</span>
+├── models/
+│   ├── __init__.py
+│   └── task.py             <span class="c"># Task dataclass + validate()</span>
+├── ui/
+│   ├── __init__.py
+│   ├── main_window.py      <span class="c"># table, toolbar, search, button handlers</span>
+│   ├── task_dialog.py      <span class="c"># one dialog for BOTH add and edit</span>
+│   └── styles.py           <span class="c"># QSS stylesheet (CSS-like look and feel)</span>
+└── tests/
+    └── test_task_repo.py   <span class="c"># proves the DB layer and validation work</span></pre>
+
+<div class="table-wrap"><table>
+  <tr><th>File</th><th>The one question it answers</th></tr>
+  <tr><td><code>config.py</code></td><td>&ldquo;Where do I change a value that many files use?&rdquo; (Here, once.)</td></tr>
+  <tr><td><code>db/connection.py</code></td><td>&ldquo;How do I talk to the database safely?&rdquo;</td></tr>
+  <tr><td><code>db/schema.py</code></td><td>&ldquo;What does the database look like?&rdquo;</td></tr>
+  <tr><td><code>db/task_repo.py</code></td><td>&ldquo;How do I save and fetch a Task?&rdquo;</td></tr>
+  <tr><td><code>models/task.py</code></td><td>&ldquo;What is a Task, and what makes one valid?&rdquo;</td></tr>
+  <tr><td><code>ui/main_window.py</code></td><td>&ldquo;What does the user see, and what happens when they click?&rdquo;</td></tr>
+  <tr><td><code>ui/task_dialog.py</code></td><td>&ldquo;How does the user enter or change one task?&rdquo;</td></tr>
+  <tr><td><code>main.py</code></td><td>&ldquo;What starts everything?&rdquo;</td></tr>
+</table></div>
+
+<div class="callout tip"><span class="t">What is <code>__init__.py</code> for?</span>
+<p>A folder containing an <code>__init__.py</code> is a Python <em>package</em>, which is what lets you write <code>from db.task_repo import create</code>. It also solves a git quirk: git does not track empty folders, so a one-line (even empty) file keeps the folder in your repository.</p></div>
+
+<!-- ===================================================== STEP 1 -->
+<section class="step">
+<div class="step-head"><div class="badge">1</div><h2 id="step-1">Project setup</h2></div>
+<p class="meta">About 20 minutes &middot; Goal: an empty but organised project, tracked by git.</p>
+
+<div class="callout why"><span class="t">Why</span>
+<p>Structure first, code second. A virtual environment keeps this project's libraries separate from every other project on your machine, <code>requirements.txt</code> lets anyone rebuild that environment, and git from minute zero means you can always get back to a working state.</p></div>
+
+<h3>1.1 Create the folder and the repository</h3>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>mkdir todo_app
+cd todo_app
+git init
+python -m venv .venv</code></pre></figure>
+
+<h3>1.2 Activate the virtual environment</h3>
+<div class="table-wrap"><table>
+  <tr><th>Shell</th><th>Command</th></tr>
+  <tr><td>Windows PowerShell</td><td><code>.venv\Scripts\Activate.ps1</code></td></tr>
+  <tr><td>Windows cmd</td><td><code>.venv\Scripts\activate.bat</code></td></tr>
+  <tr><td>macOS / Linux</td><td><code>source .venv/bin/activate</code></td></tr>
+</table></div>
+<p>Your prompt should now start with <code>(.venv)</code>. If PowerShell refuses to run the script, run <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> once and try again.</p>
+
+<h3>1.3 Declare and install the dependency</h3>
+<figure class="code"><figcaption><span>requirements.txt</span><span class="tag new">new file</span></figcaption><pre><code>PyQt6&gt;=6.8</code></pre></figure>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>pip install -r requirements.txt</code></pre></figure>
+<p>We ask for 6.8 or newer because in step 12 we use <code>setColorScheme</code>, which arrived in Qt 6.8.</p>
+
+<h3>1.4 Keep junk out of git</h3>
+<figure class="code"><figcaption><span>.gitignore</span><span class="tag new">new file</span></figcaption><pre><code>venv/
+.venv/
+__pycache__/
+*.pyc
+*.db
+.pytest_cache/
+.vscode/</code></pre></figure>
+
+<h3>1.5 Create the package folders</h3>
+<p>Make the three folders <code>db</code>, <code>models</code> and <code>ui</code>, and put an <strong>empty file named <code>__init__.py</code></strong> inside each (your editor's &ldquo;New File&rdquo; is fine). Why, see the box at the end of the structure section.</p>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>python -c &quot;from PyQt6.QtWidgets import QApplication; print(&#x27;Qt is ready&#x27;)&quot;
+git status</code></pre></figure>
+<p>You should see <code>Qt is ready</code>, then git listing your new files as <em>untracked</em>, with no <code>.venv</code> among them.</p></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li>Installing PyQt6 <em>before</em> activating the venv, which puts it in your global Python. Check for <code>(.venv)</code> in the prompt.</li>
+  <li>Naming the file <code>__init__.py.txt</code> (hidden extensions on Windows) or <code>_init_.py</code>.</li>
+  <li>Using <code>pip install PyQt5</code> from muscle memory. We are on PyQt<strong>6</strong>.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 1</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;chore: init repo, venv, requirements, .gitignore, folder skeleton&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Why is <code>.venv/</code> in <code>.gitignore</code> but <code>requirements.txt</code> is committed? <em>(Answer: the venv is a big, machine-specific build product; the requirements file is the small recipe that recreates it anywhere.)</em></p></div>
+</section>
+
+<!-- ===================================================== STEP 2 -->
+<section class="step">
+<div class="step-head"><div class="badge">2</div><h2 id="step-2">Config, connection and schema</h2></div>
+<p class="meta">About 30 minutes &middot; Goal: running <code>init_db()</code> creates a <code>todo.db</code> file with a <code>tasks</code> table.</p>
+
+<div class="callout why"><span class="t">Why</span>
+<p>The database layer needs three small things before any real query: <strong>constants</strong> (where is the file?), a <strong>safe way to open a connection</strong> (commit when it worked, roll back when it didn't, always close), and the <strong>table definition</strong>. Doing the connection handling once, in one place, means no other file can forget it.</p></div>
+
+<h3>2.1 <code>config.py</code>: constants in one place</h3>
+<figure class="code"><figcaption><span>config.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">from</span> pathlib <span class="k">import</span> Path
+
+<span class="c"># Folder that contains this file, so the DB is always created next to the code</span>
+BASE_DIR = Path(__file__).resolve().parent
+
+DB_PATH = BASE_DIR / <span class="s">&quot;todo.db&quot;</span>
+APP_TITLE = <span class="s">&quot;Todo Manager&quot;</span>
+
+STATUSES = [<span class="s">&quot;Todo&quot;</span>, <span class="s">&quot;In Progress&quot;</span>, <span class="s">&quot;Done&quot;</span>]
+PRIORITIES = {<span class="n">1</span>: <span class="s">&quot;High&quot;</span>, <span class="n">2</span>: <span class="s">&quot;Medium&quot;</span>, <span class="n">3</span>: <span class="s">&quot;Low&quot;</span>}
+
+DATE_FORMAT = <span class="s">&quot;yyyy-MM-dd&quot;</span>  <span class="c"># Qt format string (QDateEdit)</span></code></pre></figure>
+<ul>
+  <li><code>Path(__file__).resolve().parent</code> is &ldquo;the folder this file lives in&rdquo;. Using it means <code>todo.db</code> is created next to the code <em>no matter which folder you launch from</em>.</li>
+  <li><code>STATUSES</code> is the <strong>single source of truth</strong>: the dialog's drop-down, the validation and the filter will all read this list. Add a status here and the whole app learns it.</li>
+  <li><code>PRIORITIES</code> maps a number to a label. We store the <em>number</em> because <code>ORDER BY priority</code> then puts High (1) first for free.</li>
+</ul>
+
+<h3>2.2 <code>db/connection.py</code>: open, commit, roll back, close</h3>
+<figure class="code"><figcaption><span>db/connection.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">import</span> sqlite3
+<span class="k">from</span> contextlib <span class="k">import</span> contextmanager
+
+<span class="k">import</span> config
+
+
+<span class="k">def</span> <span class="f">get_connection</span>(db_path=<span class="k">None</span>):
+    <span class="s">&quot;&quot;&quot;Open a new SQLite connection. Rows behave like dicts (row[&quot;title&quot;]).&quot;&quot;&quot;</span>
+    conn = sqlite3.connect(db_path <span class="k">or</span> config.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    <span class="k">return</span> conn
+
+
+@contextmanager
+<span class="k">def</span> <span class="f">connection</span>(db_path=<span class="k">None</span>):
+    <span class="s">&quot;&quot;&quot;Commit on success, roll back on error, always close.&quot;&quot;&quot;</span>
+    conn = get_connection(db_path)
+    <span class="k">try</span>:
+        <span class="k">yield</span> conn
+        conn.commit()
+    <span class="k">except</span> <span class="b">Exception</span>:
+        conn.rollback()
+        <span class="k">raise</span>
+    <span class="k">finally</span>:
+        conn.close()</code></pre></figure>
+<ul>
+  <li><code>sqlite3.connect(path)</code> opens the file, or creates it if it is missing.</li>
+  <li><code>row_factory = sqlite3.Row</code> lets us write <code>row["title"]</code> instead of remembering that title is column number 1.</li>
+  <li><code>@contextmanager</code> turns the function into something you can use with <code>with</code>. Everything <em>before</em> <code>yield</code> is set-up, the value after <code>yield</code> is handed to the <code>with</code> block, and everything after is clean-up.</li>
+  <li>If the block finishes normally: <code>commit()</code> (make changes permanent). If it raises: <code>rollback()</code> (undo half-finished work) and re-raise so the caller still knows. Either way <code>finally</code> closes the connection.</li>
+  <li><code>db_path or config.DB_PATH</code> reads <code>config.DB_PATH</code> <em>at call time</em>, not at import time. Remember this: it is what lets our tests in step 13 point the app at a throw-away database.</li>
+</ul>
+
+<div class="callout tip"><span class="t">Why open and close for every operation?</span>
+<p>SQLite connections are cheap, and a short-lived connection cannot go stale, leak, or be used from the wrong thread. It is the simplest correct design for a desktop app of this size. (Connection pooling is something you learn when you actually have a performance problem.)</p></div>
+
+<h3>2.3 <code>db/schema.py</code>: the table</h3>
+<figure class="code"><figcaption><span>db/schema.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">from</span> db.connection <span class="k">import</span> connection
+
+CREATE_TASKS_TABLE = <span class="s">&quot;&quot;&quot;
+CREATE TABLE IF NOT EXISTS tasks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT    NOT NULL,
+    description TEXT    NOT NULL DEFAULT &#x27;&#x27;,
+    status      TEXT    NOT NULL DEFAULT &#x27;Todo&#x27;,
+    priority    INTEGER NOT NULL DEFAULT 2,
+    due_date    TEXT,
+    created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+&quot;&quot;&quot;</span>
+
+
+<span class="k">def</span> <span class="f">init_db</span>():
+    <span class="s">&quot;&quot;&quot;Create the tables if they do not exist yet. Safe to call on every start.&quot;&quot;&quot;</span>
+    <span class="k">with</span> connection() <span class="k">as</span> conn:
+        conn.execute(CREATE_TASKS_TABLE)</code></pre></figure>
+<ul>
+  <li><code>IF NOT EXISTS</code> makes <code>init_db()</code> <strong>idempotent</strong>: safe to call on every start-up.</li>
+  <li><code>INTEGER PRIMARY KEY AUTOINCREMENT</code>: SQLite hands out ids 1, 2, 3&hellip; and never reuses a deleted one.</li>
+  <li><code>NOT NULL DEFAULT ...</code>: the database itself refuses a missing title and fills sensible defaults. This is your last line of defence behind the Python validation.</li>
+  <li><code>due_date</code> is nullable <code>TEXT</code>: SQLite has no date type, so we store ISO strings (<code>2026-12-31</code>), which conveniently sort in date order.</li>
+  <li><code>CURRENT_TIMESTAMP</code> is filled in by the database (in UTC) when a row is inserted.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<p>From the <code>todo_app</code> folder (with the venv active):</p>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>python -c &quot;from db.schema import init_db; init_db()&quot;
+python -c &quot;import sqlite3; print(sqlite3.connect(&#x27;todo.db&#x27;).execute(&#x27;select name from sqlite_master&#x27;).fetchall())&quot;</code></pre></figure>
+<p>Expected output (the second table is SQLite's own bookkeeping for <code>AUTOINCREMENT</code>):</p>
+<figure class="code"><figcaption><span>output</span></figcaption><pre><code>[(&#x27;tasks&#x27;,), (&#x27;sqlite_sequence&#x27;,)]</code></pre></figure>
+<p>A new <code>todo.db</code> file now sits in your folder, and <code>git status</code> must <strong>not</strong> list it.</p></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li><code>ModuleNotFoundError: No module named 'config'</code>: you ran Python from the wrong folder. Always run from <code>todo_app/</code>.</li>
+  <li><code>sqlite3.OperationalError: near "...": syntax error</code>: a typo in the SQL text. Read the quoted fragment; the mistake is just before it. A trailing comma after the last column is the classic.</li>
+  <li>Forgetting to indent the body under <code>with connection() as conn:</code>.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 2</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(db): connection helper and schema/init_db&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>What happens to a half-finished <code>INSERT</code> if an exception is raised inside the <code>with</code> block? And what would break if we forgot the <code>finally</code>?</p></div>
+</section>
+
+<!-- ===================================================== STEP 3 -->
+<section class="step">
+<div class="step-head"><div class="badge">3</div><h2 id="step-3">The Task model and validation</h2></div>
+<p class="meta">About 25 minutes &middot; Goal: a <code>Task</code> object that knows what &ldquo;valid&rdquo; means.</p>
+
+<div class="callout why"><span class="t">Why</span>
+<p>Passing around loose tuples like <code>(1, "Buy milk", "Todo", 2, None)</code> is how bugs are born: nobody remembers what position 3 is. A <code>Task</code> object has named fields. And the rules for what is valid belong <em>with the data</em>, not inside a button handler, so the dialog, the tests and any future import script can all reuse them.</p></div>
+
+<figure class="code"><figcaption><span>models/task.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">from</span> dataclasses <span class="k">import</span> dataclass
+<span class="k">from</span> datetime <span class="k">import</span> date
+<span class="k">from</span> typing <span class="k">import</span> Optional
+
+<span class="k">import</span> config
+
+
+@dataclass
+<span class="k">class</span> <span class="f">Task</span>:
+    title: <span class="b">str</span>
+    description: <span class="b">str</span> = <span class="s">&quot;&quot;</span>
+    status: <span class="b">str</span> = <span class="s">&quot;Todo&quot;</span>
+    priority: <span class="b">int</span> = <span class="n">2</span>
+    due_date: Optional[<span class="b">str</span>] = <span class="k">None</span>  <span class="c"># &quot;YYYY-MM-DD&quot; or None</span>
+    id: Optional[<span class="b">int</span>] = <span class="k">None</span>  <span class="c"># None until the row is saved</span>
+    created_at: Optional[<span class="b">str</span>] = <span class="k">None</span>
+
+    <span class="k">def</span> <span class="f">validate</span>(<span class="b">self</span>) -&gt; <span class="b">list</span>[<span class="b">str</span>]:
+        <span class="s">&quot;&quot;&quot;Return a list of human-readable problems (empty list = valid).&quot;&quot;&quot;</span>
+        errors = []
+
+        title = <span class="b">self</span>.title.strip()
+        <span class="k">if</span> <span class="k">not</span> title:
+            errors.append(<span class="s">&quot;Title is required.&quot;</span>)
+        <span class="k">elif</span> <span class="b">len</span>(title) &gt; <span class="n">100</span>:
+            errors.append(<span class="s">&quot;Title must be 100 characters or fewer.&quot;</span>)
+
+        <span class="k">if</span> <span class="b">self</span>.status <span class="k">not</span> <span class="k">in</span> config.STATUSES:
+            errors.append(<span class="s">f&quot;Status must be one of: {&#x27;, &#x27;.join(config.STATUSES)}.&quot;</span>)
+
+        <span class="k">if</span> <span class="b">self</span>.priority <span class="k">not</span> <span class="k">in</span> config.PRIORITIES:
+            errors.append(<span class="s">&quot;Priority must be High, Medium or Low.&quot;</span>)
+
+        <span class="k">if</span> <span class="b">self</span>.due_date:
+            <span class="k">try</span>:
+                date.fromisoformat(<span class="b">self</span>.due_date)
+            <span class="k">except</span> <span class="b">ValueError</span>:
+                errors.append(<span class="s">&quot;Due date must look like YYYY-MM-DD.&quot;</span>)
+
+        <span class="k">return</span> errors</code></pre></figure>
+<ul>
+  <li><code>@dataclass</code> writes <code>__init__</code>, <code>__repr__</code> and <code>__eq__</code> for you from the annotated fields.</li>
+  <li>Fields without defaults (<code>title</code>) must come <strong>before</strong> fields with defaults. That is a Python rule.</li>
+  <li><code>id</code> is <code>None</code> until the task has been saved, which is how we tell &ldquo;new&rdquo; from &ldquo;existing&rdquo;.</li>
+  <li><code>validate()</code> returns a <strong>list of messages</strong> and never raises. Errors as data means the UI can show <em>all</em> the problems at once instead of one per click.</li>
+  <li>It reads <code>config.STATUSES</code> and <code>config.PRIORITIES</code>, so the rules stay in sync with the drop-downs automatically.</li>
+  <li><code>date.fromisoformat</code> raises <code>ValueError</code> for anything that is not a real date, so <code>31/12/2026</code> and <code>2026-13-40</code> are both caught.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>python -c &quot;from models.task import Task; print(Task(title=&#x27;  &#x27;).validate()); print(Task(title=&#x27;Learn SQL&#x27;).validate()); print(Task(title=&#x27;x&#x27;, status=&#x27;Nope&#x27;, priority=9, due_date=&#x27;1/1/26&#x27;).validate())&quot;</code></pre></figure>
+<figure class="code"><figcaption><span>output</span></figcaption><pre><code>[&#x27;Title is required.&#x27;]
+[]
+[&#x27;Status must be one of: Todo, In Progress, Done.&#x27;, &#x27;Priority must be High, Medium or Low.&#x27;, &#x27;Due date must look like YYYY-MM-DD.&#x27;]</code></pre></figure></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li><code>TypeError: non-default argument 'id' follows default argument</code>: you put a defaulted field above one without a default.</li>
+  <li>Using a mutable default like <code>tags: list = []</code>. (Not needed here, but remember: dataclasses require <code>field(default_factory=list)</code> for that.)</li>
+  <li>Importing PyQt6 in this file. The model must not know a UI exists.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 3</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(models): Task dataclass and validation&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Why does <code>validate()</code> return a list instead of raising on the first problem?</p></div>
+</section>
+
+<!-- ===================================================== STEP 4 -->
+<section class="step">
+<div class="step-head"><div class="badge">4</div><h2 id="step-4">Repository: Create and Read</h2></div>
+<p class="meta">About 35 minutes &middot; Goal: save a <code>Task</code> to the database and get it back.</p>
+
+<div class="callout why"><span class="t">Why a &ldquo;repository&rdquo;?</span>
+<p>A repository is a module whose only job is <em>translating between Task objects and database rows</em>. Everything above it speaks <code>Task</code>; only this file speaks SQL. That is the replacement test from the architecture section in action.</p></div>
+
+<p>Write the first half of the file now. (We will add to it in the next step.)</p>
+<figure class="code"><figcaption><span>db/task_repo.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">from</span> typing <span class="k">import</span> Optional
+
+<span class="k">from</span> db.connection <span class="k">import</span> connection
+<span class="k">from</span> models.task <span class="k">import</span> Task
+
+
+<span class="k">def</span> <span class="f">_row_to_task</span>(row) -&gt; Task:
+    <span class="s">&quot;&quot;&quot;Turn one sqlite3.Row into a Task object.&quot;&quot;&quot;</span>
+    <span class="k">return</span> Task(
+        id=row[<span class="s">&quot;id&quot;</span>],
+        title=row[<span class="s">&quot;title&quot;</span>],
+        description=row[<span class="s">&quot;description&quot;</span>],
+        status=row[<span class="s">&quot;status&quot;</span>],
+        priority=row[<span class="s">&quot;priority&quot;</span>],
+        due_date=row[<span class="s">&quot;due_date&quot;</span>],
+        created_at=row[<span class="s">&quot;created_at&quot;</span>],
+    )
+
+
+<span class="k">def</span> <span class="f">create</span>(task: Task) -&gt; <span class="b">int</span>:
+    <span class="s">&quot;&quot;&quot;INSERT a task and return its new id.&quot;&quot;&quot;</span>
+    <span class="k">with</span> connection() <span class="k">as</span> conn:
+        cur = conn.execute(
+            <span class="s">&quot;INSERT INTO tasks (title, description, status, priority, due_date) &quot;</span>
+            <span class="s">&quot;VALUES (?, ?, ?, ?, ?)&quot;</span>,
+            (task.title.strip(), task.description, task.status, task.priority, task.due_date),
+        )
+        <span class="k">return</span> cur.lastrowid
+
+
+<span class="k">def</span> <span class="f">get_by_id</span>(task_id: <span class="b">int</span>) -&gt; Optional[Task]:
+    <span class="s">&quot;&quot;&quot;Return one task, or None when the id does not exist.&quot;&quot;&quot;</span>
+    <span class="k">with</span> connection() <span class="k">as</span> conn:
+        row = conn.execute(<span class="s">&quot;SELECT * FROM tasks WHERE id = ?&quot;</span>, (task_id,)).fetchone()
+    <span class="k">return</span> _row_to_task(row) <span class="k">if</span> row <span class="k">else</span> <span class="k">None</span>
+
+
+<span class="k">def</span> <span class="f">list_all</span>() -&gt; <span class="b">list</span>[Task]:
+    <span class="s">&quot;&quot;&quot;Return every task (we add search/filter in the next commit).&quot;&quot;&quot;</span>
+    <span class="k">with</span> connection() <span class="k">as</span> conn:
+        rows = conn.execute(<span class="s">&quot;SELECT * FROM tasks ORDER BY id DESC&quot;</span>).fetchall()
+    <span class="k">return</span> [_row_to_task(r) <span class="k">for</span> r <span class="k">in</span> rows]</code></pre></figure>
+
+<h3>The most important rule in this whole project</h3>
+<p>Values go into SQL through <strong><code>?</code> placeholders</strong>, never by gluing strings together:</p>
+<figure class="code"><figcaption><span>NEVER do this</span><span class="tag bad">wrong</span></figcaption><pre><code>conn.execute(<span class="s">f&quot;INSERT INTO tasks (title) VALUES (&#x27;{task.title}&#x27;)&quot;</span>)   <span class="c"># SQL injection</span></code></pre></figure>
+<figure class="code"><figcaption><span>Always do this</span><span class="tag good">right</span></figcaption><pre><code>conn.execute(<span class="s">&quot;INSERT INTO tasks (title) VALUES (?)&quot;</span>, (task.title,))   <span class="c"># safe</span></code></pre></figure>
+<p>If a user types <code>x'); DROP TABLE tasks; --</code> as a title, the first version runs that as SQL and deletes your table. The second treats it as plain text. (In step 13 you will write a test that proves it.)</p>
+
+<ul>
+  <li><code>_row_to_task</code> is the <em>only</em> place that knows column names map to <code>Task</code> fields. The leading underscore means &ldquo;private to this file&rdquo;.</li>
+  <li><code>cur.lastrowid</code> is the id SQLite just generated, which is useful to return.</li>
+  <li><code>return cur.lastrowid</code> sits <em>inside</em> the <code>with</code> block, and the commit still happens. The <code>return</code> simply runs the context manager's after-<code>yield</code> code first.</li>
+  <li>The tuple <code>(task_id,)</code> needs that trailing comma. <code>(task_id)</code> is just a number in brackets, and SQLite would complain about the wrong number of bindings.</li>
+  <li><code>fetchone()</code> returns <code>None</code> when nothing matches, so <code>get_by_id</code> returns <code>None</code> for a missing id and the caller decides what to do.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>python -c &quot;from db.schema import init_db; from db import task_repo as r; from models.task import Task; init_db(); i=r.create(Task(title=&#x27;Learn SQL&#x27;)); print(i); print(r.get_by_id(i)); print(r.get_by_id(999)); print(len(r.list_all()))&quot;</code></pre></figure>
+<figure class="code"><figcaption><span>output</span><span class="hint">created_at will show your own time</span></figcaption><pre><code>1
+Task(title=&#x27;Learn SQL&#x27;, description=&#x27;&#x27;, status=&#x27;Todo&#x27;, priority=2, due_date=None, id=1, created_at=&#x27;2026-11-07 02:51:16&#x27;)
+None
+1</code></pre></figure>
+<p>Run it twice and the first number becomes 2 and the last 2: the data <em>persisted</em> in <code>todo.db</code>. Delete <code>todo.db</code> now so the next step starts with a clean slate. It is only a file, and <code>init_db()</code> will recreate it.</p></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li><code>sqlite3.ProgrammingError: Incorrect number of bindings supplied</code>: count your <code>?</code> against the tuple, and check for the trailing comma.</li>
+  <li><code>sqlite3.OperationalError: no such table: tasks</code>: you did not call <code>init_db()</code> first, or you are looking at a different <code>todo.db</code> because you ran from another folder.</li>
+  <li>Building SQL with an f-string &ldquo;just this once&rdquo;. There is no &ldquo;just this once&rdquo;.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 4</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(db): task repository - create and read&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Where would you have to change code if the table gained a <code>tags</code> column? <em>(Answer: schema, the model, <code>_row_to_task</code>, create/update. Each file once, nothing in the UI until you want to show it.)</em></p></div>
+</section>
+
+<!-- ===================================================== STEP 5 -->
+<section class="step">
+<div class="step-head"><div class="badge">5</div><h2 id="step-5">Repository: Update, Delete, Search</h2></div>
+<p class="meta">About 35 minutes &middot; Goal: finish the repository, so the entire data layer is done before any UI exists.</p>
+
+<div class="callout why"><span class="t">Why finish the data layer first?</span>
+<p>Bugs are cheaper to find when only one layer can be at fault. If the repository is correct <em>before</em> the UI exists, then any later misbehaviour is a UI bug. This is called working bottom-up.</p></div>
+
+<h3>5.1 Add <code>update</code> and <code>delete</code></h3>
+<p>Add these two functions at the bottom of <code>db/task_repo.py</code>:</p>
+<figure class="code"><figcaption><span>db/task_repo.py</span><span class="tag edit">add to file</span><span class="hint">bottom of the file</span></figcaption><pre><code><span class="k">def</span> <span class="f">update</span>(task: Task) -&gt; <span class="b">bool</span>:
+    <span class="s">&quot;&quot;&quot;UPDATE an existing task. Returns True if a row was changed.&quot;&quot;&quot;</span>
+    <span class="k">if</span> task.id <span class="k">is</span> <span class="k">None</span>:
+        <span class="k">raise</span> <span class="b">ValueError</span>(<span class="s">&quot;Cannot update a task that has no id.&quot;</span>)
+
+    <span class="k">with</span> connection() <span class="k">as</span> conn:
+        cur = conn.execute(
+            <span class="s">&quot;UPDATE tasks SET title = ?, description = ?, status = ?, &quot;</span>
+            <span class="s">&quot;priority = ?, due_date = ? WHERE id = ?&quot;</span>,
+            (task.title.strip(), task.description, task.status,
+             task.priority, task.due_date, task.id),
+        )
+        <span class="k">return</span> cur.rowcount &gt; <span class="n">0</span>
+
+<span class="k">def</span> <span class="f">delete</span>(task_id: <span class="b">int</span>) -&gt; <span class="b">bool</span>:
+    <span class="s">&quot;&quot;&quot;DELETE a task. Returns True if a row was removed.&quot;&quot;&quot;</span>
+    <span class="k">with</span> connection() <span class="k">as</span> conn:
+        cur = conn.execute(<span class="s">&quot;DELETE FROM tasks WHERE id = ?&quot;</span>, (task_id,))
+        <span class="k">return</span> cur.rowcount &gt; <span class="n">0</span></code></pre></figure>
+<ul>
+  <li><code>UPDATE ... WHERE id = ?</code>: <strong>never forget the WHERE</strong>. Without it every row in the table gets the same title.</li>
+  <li><code>cur.rowcount</code> is how many rows were changed. <code>&gt; 0</code> lets the caller know whether the id actually existed.</li>
+  <li><code>update</code> raises <code>ValueError</code> for a task without an id. That is a <em>programming</em> error (a bug), so failing loudly is right; compare with validation, which handles <em>user</em> mistakes.</li>
+</ul>
+
+<h3>5.2 Replace <code>list_all</code> with the filtering version</h3>
+<p>Delete your simple <code>list_all</code> and type this one instead:</p>
+<figure class="code"><figcaption><span>db/task_repo.py</span><span class="tag edit">replace</span><span class="hint">replaces the old list_all</span></figcaption><pre><code><span class="k">def</span> <span class="f">list_all</span>(search: <span class="b">str</span> = <span class="s">&quot;&quot;</span>, status: Optional[<span class="b">str</span>] = <span class="k">None</span>) -&gt; <span class="b">list</span>[Task]:
+    <span class="s">&quot;&quot;&quot;Return tasks, optionally filtered by a search text and/or a status.&quot;&quot;&quot;</span>
+    sql = <span class="s">&quot;SELECT * FROM tasks WHERE 1 = 1&quot;</span>
+    params = []
+
+    <span class="k">if</span> search.strip():
+        sql += <span class="s">&quot; AND (title LIKE ? OR description LIKE ?)&quot;</span>
+        like = <span class="s">f&quot;%{search.strip()}%&quot;</span>  <span class="c"># the % wildcards go in the VALUE, not the SQL</span>
+        params += [like, like]
+
+    <span class="k">if</span> status:
+        sql += <span class="s">&quot; AND status = ?&quot;</span>
+        params.append(status)
+
+    sql += <span class="s">&quot; ORDER BY priority ASC, due_date IS NULL, due_date ASC, id DESC&quot;</span>
+
+    <span class="k">with</span> connection() <span class="k">as</span> conn:
+        rows = conn.execute(sql, params).fetchall()
+    <span class="k">return</span> [_row_to_task(r) <span class="k">for</span> r <span class="k">in</span> rows]</code></pre></figure>
+<ul>
+  <li><code>WHERE 1 = 1</code> is always true. It gives every optional filter the same shape: <code>AND ...</code>.</li>
+  <li>The user's text is never put <em>into the SQL</em>. We build a <code>params</code> list in the same order as the <code>?</code> marks.</li>
+  <li><code>f"%{search.strip()}%"</code> is fine: that f-string builds the <em>value</em> (the <code>%</code> wildcards belong to the value), while the SQL text stays constant.</li>
+  <li><code>ORDER BY priority ASC, due_date IS NULL, due_date ASC, id DESC</code>: high priority first, then tasks that have a due date (soonest first) before those that do not, and newest first as a tiebreaker.</li>
+  <li><code>LIKE</code> in SQLite ignores case for plain English letters, so searching <code>buy</code> finds <code>Buy milk</code>.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<p>Delete <code>todo.db</code> first, then:</p>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>python -c &quot;from db.schema import init_db; from db import task_repo as r; from models.task import Task; init_db(); r.create(Task(title=&#x27;Buy milk&#x27;)); r.create(Task(title=&#x27;Buy bread&#x27;, status=&#x27;Done&#x27;)); print([t.title for t in r.list_all(search=&#x27;buy&#x27;)]); print([t.title for t in r.list_all(status=&#x27;Done&#x27;)]); print(r.delete(999))&quot;</code></pre></figure>
+<figure class="code"><figcaption><span>output</span></figcaption><pre><code>[&#x27;Buy bread&#x27;, &#x27;Buy milk&#x27;]
+[&#x27;Buy bread&#x27;]
+False</code></pre></figure></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li>Missing space when concatenating SQL pieces: <code>"... WHERE 1 = 1" "AND ..."</code> becomes <code>1 = 1AND</code>. Notice each added fragment starts with a space.</li>
+  <li><code>params</code> in a different order than the <code>?</code> marks.</li>
+  <li>Writing <code>params.append(like, like)</code> (two arguments) instead of <code>params += [like, like]</code>.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 5</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(db): update, delete and search/filter in repo&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Delete <code>WHERE id = ?</code> from <code>update</code> on a <em>copy</em> of the database. What happens, and why is that the scariest typo in SQL?</p></div>
+</section>
+
+<!-- ===================================================== STEP 6 -->
+<section class="step">
+<div class="step-head"><div class="badge">6</div><h2 id="step-6">Main window shell</h2></div>
+<p class="meta">About 45 minutes &middot; Goal: a window with the toolbar and an empty table. Nothing works yet, and that is fine.</p>
+
+<div class="callout why"><span class="t">Why shell first</span>
+<p>Layout bugs and logic bugs are different animals. Build the <em>looks</em> first, see it on screen, then add behaviour one feature at a time. Every later step touches only a few lines.</p></div>
+
+<h3>6.1 <code>ui/main_window.py</code></h3>
+<p>We import everything we will eventually need now, so we do not keep scrolling to the top. A few imports will be unused for a while, which is normal.</p>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">import</span> sqlite3
+
+<span class="k">from</span> PyQt6.QtWidgets <span class="k">import</span> (
+    QAbstractItemView,
+    QComboBox,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+<span class="k">import</span> config
+<span class="k">from</span> db <span class="k">import</span> task_repo
+
+
+<span class="k">class</span> <span class="f">MainWindow</span>(QMainWindow):
+    COLUMNS = [<span class="s">&quot;ID&quot;</span>, <span class="s">&quot;Title&quot;</span>, <span class="s">&quot;Status&quot;</span>, <span class="s">&quot;Priority&quot;</span>, <span class="s">&quot;Due&quot;</span>, <span class="s">&quot;Created&quot;</span>]
+
+    <span class="k">def</span> <span class="f">__init__</span>(<span class="b">self</span>):
+        <span class="b">super</span>().__init__()
+        <span class="b">self</span>.setWindowTitle(config.APP_TITLE)
+        <span class="b">self</span>.resize(<span class="n">900</span>, <span class="n">560</span>)
+
+        <span class="b">self</span>._build_ui()
+
+    <span class="c"># ------------------------------------------------------------------ UI</span>
+    <span class="k">def</span> <span class="f">_build_ui</span>(<span class="b">self</span>):
+        <span class="c"># Top bar: search + filter on the left, buttons on the right</span>
+        <span class="b">self</span>.search_input = QLineEdit()
+        <span class="b">self</span>.search_input.setPlaceholderText(<span class="s">&quot;Search title or description...&quot;</span>)
+        <span class="b">self</span>.search_input.setClearButtonEnabled(<span class="k">True</span>)
+
+        <span class="b">self</span>.status_filter = QComboBox()
+        <span class="b">self</span>.status_filter.addItem(<span class="s">&quot;All statuses&quot;</span>)
+        <span class="b">self</span>.status_filter.addItems(config.STATUSES)
+
+        <span class="b">self</span>.add_button = QPushButton(<span class="s">&quot;+ Add task&quot;</span>)
+        <span class="b">self</span>.add_button.setObjectName(<span class="s">&quot;primary&quot;</span>)  <span class="c"># used by the stylesheet later</span>
+        <span class="b">self</span>.edit_button = QPushButton(<span class="s">&quot;Edit&quot;</span>)
+        <span class="b">self</span>.delete_button = QPushButton(<span class="s">&quot;Delete&quot;</span>)
+        <span class="b">self</span>.delete_button.setObjectName(<span class="s">&quot;danger&quot;</span>)
+        <span class="b">self</span>.edit_button.setEnabled(<span class="k">False</span>)
+        <span class="b">self</span>.delete_button.setEnabled(<span class="k">False</span>)
+
+        top_bar = QHBoxLayout()
+        top_bar.addWidget(<span class="b">self</span>.search_input, stretch=<span class="n">1</span>)
+        top_bar.addWidget(<span class="b">self</span>.status_filter)
+        top_bar.addWidget(<span class="b">self</span>.add_button)
+        top_bar.addWidget(<span class="b">self</span>.edit_button)
+        top_bar.addWidget(<span class="b">self</span>.delete_button)
+
+        <span class="c"># The table</span>
+        <span class="b">self</span>.table = QTableWidget(<span class="n">0</span>, <span class="b">len</span>(<span class="b">self</span>.COLUMNS))
+        <span class="b">self</span>.table.setHorizontalHeaderLabels(<span class="b">self</span>.COLUMNS)
+        <span class="b">self</span>.table.verticalHeader().setVisible(<span class="k">False</span>)
+        <span class="b">self</span>.table.setAlternatingRowColors(<span class="k">True</span>)
+        <span class="b">self</span>.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        <span class="b">self</span>.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        <span class="b">self</span>.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+        header = <span class="b">self</span>.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(<span class="n">1</span>, QHeaderView.ResizeMode.Stretch)  <span class="c"># Title grows</span>
+
+        <span class="c"># Put everything in the window</span>
+        central = QWidget()
+        layout = QVBoxLayout(central)
+        layout.addLayout(top_bar)
+        layout.addWidget(<span class="b">self</span>.table)
+        <span class="b">self</span>.setCentralWidget(central)
+
+        <span class="b">self</span>.statusBar().showMessage(<span class="s">&quot;Ready&quot;</span>)</code></pre></figure>
+
+<h3>6.2 <code>main.py</code></h3>
+<figure class="code"><figcaption><span>main.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">import</span> sys
+
+<span class="k">from</span> PyQt6.QtWidgets <span class="k">import</span> QApplication
+
+<span class="k">from</span> db.schema <span class="k">import</span> init_db
+<span class="k">from</span> ui.main_window <span class="k">import</span> MainWindow
+
+
+<span class="k">def</span> <span class="f">main</span>():
+    init_db()  <span class="c"># make sure the table exists BEFORE the UI asks for data</span>
+
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
+
+
+<span class="k">if</span> __name__ == <span class="s">&quot;__main__&quot;</span>:
+    main()</code></pre></figure>
+
+<h3>How the window is put together</h3>
+<ul>
+  <li><strong><code>QMainWindow</code></strong> gives us a ready-made frame: a central area, a status bar, room for menus.</li>
+  <li><strong>Widgets</strong> are the visible things: <code>QLineEdit</code> (text box), <code>QComboBox</code> (drop-down), <code>QPushButton</code>, <code>QTableWidget</code>.</li>
+  <li><strong>Layouts</strong> position widgets so you never compute pixel coordinates. <code>QHBoxLayout</code> lines things up in a row, <code>QVBoxLayout</code> in a column. Here a row (the top bar) sits above the table in a column.</li>
+  <li><code>stretch=1</code> on the search box means &ldquo;take all the spare width&rdquo;, so the buttons stay at their natural size.</li>
+  <li>A layout needs a <strong>container widget</strong>, and a <code>QMainWindow</code> needs one called its <em>central widget</em>. That is the <code>central = QWidget()</code> part.</li>
+  <li><code>setSelectionBehavior(SelectRows)</code> + <code>SingleSelection</code>: clicking a cell selects the whole row, one at a time. <code>NoEditTriggers</code> stops users typing straight into cells, because all edits go through the dialog and the database.</li>
+  <li><code>setSectionResizeMode(1, Stretch)</code>: column 1 (Title) soaks up the extra width; the other columns fit their content.</li>
+  <li><code>setObjectName("primary")</code> is a label we can target from the stylesheet in step 12. It does nothing visible yet.</li>
+  <li>In <code>main.py</code>: <code>init_db()</code> runs <em>before</em> the window exists, because the window will soon ask for data. <code>app.exec()</code> starts the event loop and only returns when the window closes; <code>sys.exit(...)</code> passes its exit code to the OS.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>python main.py</code></pre></figure>
+<p>A 900&times;560 window titled <em>Todo Manager</em> appears with a search box, a status drop-down, three buttons (Edit and Delete are greyed out), an empty table with six column headers, and &ldquo;Ready&rdquo; in the status bar. Closing the window ends the program.</p></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li>Forgetting <code>super().__init__()</code> as the first line of <code>__init__</code>: <code>RuntimeError: super-class __init__() of type MainWindow was never called</code>.</li>
+  <li>Creating a widget but never adding it to a layout: it simply does not appear.</li>
+  <li>PyQt5-style enums: <code>QAbstractItemView.SelectRows</code> raises <code>AttributeError</code>. In PyQt6 it is <code>QAbstractItemView.SelectionBehavior.SelectRows</code>.</li>
+  <li>The window flashes open and closes instantly: <code>app.exec()</code> is missing, or you wrote <code>app.exec_()</code>.</li>
+  <li>Running <code>python ui/main_window.py</code> instead of <code>python main.py</code>. Always start from the entry point.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 6</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(ui): main window shell with empty table&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Comment out the line <code>layout.addWidget(self.table)</code> and run. What do you see, and why? Put it back.</p></div>
+</section>
+
+<!-- ===================================================== STEP 7 -->
+<section class="step">
+<div class="step-head"><div class="badge">7</div><h2 id="step-7">Read: show tasks in the table</h2></div>
+<p class="meta">About 30 minutes &middot; Goal: the table shows what is in the database. This is the <strong>R</strong> in CRUD.</p>
+
+<div class="callout why"><span class="t">Why one <code>refresh()</code> method</span>
+<p>Every other feature (add, edit, delete, search, filter) will end with &ldquo;now reload the table&rdquo;. One method that always does <em>clear, query, fill</em> means there is exactly one place to get right, and the screen can never drift out of sync with the database.</p></div>
+
+<h3>7.1 Add three methods to <code>MainWindow</code></h3>
+<p>Put them inside the class, below <code>_build_ui</code>:</p>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">add to class</span><span class="hint">inside class MainWindow</span></figcaption><pre><code>    <span class="k">def</span> <span class="f">_current_status</span>(<span class="b">self</span>):
+        <span class="s">&quot;&quot;&quot;None means &#x27;All statuses&#x27;.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="b">self</span>.status_filter.currentIndex() == <span class="n">0</span>:
+            <span class="k">return</span> <span class="k">None</span>
+        <span class="k">return</span> <span class="b">self</span>.status_filter.currentText()
+
+    <span class="k">def</span> <span class="f">_show_db_error</span>(<span class="b">self</span>, exc: <span class="b">Exception</span>):
+        QMessageBox.critical(<span class="b">self</span>, <span class="s">&quot;Database error&quot;</span>, <span class="b">str</span>(exc))
+
+    <span class="k">def</span> <span class="f">refresh</span>(<span class="b">self</span>):
+        <span class="s">&quot;&quot;&quot;Reload the table from the database (respecting search + filter).&quot;&quot;&quot;</span>
+        <span class="k">try</span>:
+            tasks = task_repo.list_all(<span class="b">self</span>.search_input.text(), <span class="b">self</span>._current_status())
+        <span class="k">except</span> sqlite3.Error <span class="k">as</span> exc:
+            <span class="b">self</span>._show_db_error(exc)
+            <span class="k">return</span>
+
+        <span class="b">self</span>.table.setRowCount(<span class="n">0</span>)  <span class="c"># clear old rows (and the selection)</span>
+        <span class="b">self</span>.table.setRowCount(<span class="b">len</span>(tasks))
+        <span class="k">for</span> row, task <span class="k">in</span> <span class="b">enumerate</span>(tasks):
+            values = [
+                task.id,
+                task.title,
+                task.status,
+                config.PRIORITIES.get(task.priority, <span class="s">&quot;?&quot;</span>),
+                task.due_date <span class="k">or</span> <span class="s">&quot;-&quot;</span>,
+                task.created_at,
+            ]
+            <span class="k">for</span> col, value <span class="k">in</span> <span class="b">enumerate</span>(values):
+                <span class="b">self</span>.table.setItem(row, col, QTableWidgetItem(<span class="b">str</span>(value)))
+
+        <span class="b">self</span>.statusBar().showMessage(<span class="s">f&quot;{len(tasks)} task(s)&quot;</span>)</code></pre></figure>
+
+<h3>7.2 Call it when the window is created</h3>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">edit</span><span class="hint">end of __init__</span></figcaption><pre><code>        <span class="b">self</span>._build_ui()
+        <span class="b">self</span>.refresh()   <span class="c"># &lt;-- add this line</span></code></pre></figure>
+
+<ul>
+  <li><code>_current_status()</code> turns the drop-down into either <code>None</code> (first item, &ldquo;All statuses&rdquo;) or the status text. Returning <code>None</code> matches how <code>list_all(status=None)</code> means &ldquo;no filter&rdquo;.</li>
+  <li><code>refresh()</code> reads the filter widgets <em>itself</em>. Callers never pass arguments, and that is what lets search and filter reuse it in step 11.</li>
+  <li><code>except sqlite3.Error</code> catches database problems (file locked, disk full, corrupted) and shows a message instead of a crash and traceback. Note that we catch the <em>specific</em> error type, not a bare <code>except:</code> that would hide real bugs.</li>
+  <li><code>setRowCount(0)</code> then <code>setRowCount(len(tasks))</code>: wipe the old rows (and the selection), then make the right number of empty ones.</li>
+  <li><code>QTableWidgetItem(str(value))</code>: table cells only accept text, so numbers become strings. <code>task.due_date or "-"</code> shows a dash when there is no date.</li>
+  <li><code>PRIORITIES.get(task.priority, "?")</code> turns the stored number into a label, with a safe fallback.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<p>There is no way to add tasks yet, so insert two from the terminal, then start the app:</p>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>python -c &quot;from db.schema import init_db; from db import task_repo as r; from models.task import Task; init_db(); r.create(Task(title=&#x27;Learn PyQt6&#x27;, priority=1)); r.create(Task(title=&#x27;Hard-code a CRUD app&#x27;, status=&#x27;In Progress&#x27;, due_date=&#x27;2026-12-31&#x27;))&quot;
+python main.py</code></pre></figure>
+<p>You should see both tasks, <em>Learn PyQt6</em> (High) above the other (Medium), and <em>2 task(s)</em> in the status bar. Close and reopen: they are still there.</p></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li><code>TypeError: ... argument 'text': 'int' ...</code>: you passed a number to <code>QTableWidgetItem</code> without <code>str()</code>.</li>
+  <li>Calling <code>self.refresh()</code> <em>before</em> <code>self._build_ui()</code>: <code>AttributeError: ... has no attribute 'table'</code>.</li>
+  <li>Table stays empty: check you ran <code>python main.py</code> from <code>todo_app/</code> so it uses the same <code>todo.db</code> you inserted into.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 7</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(ui): load and display tasks from the database&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Which line would you change to show the newest tasks first, regardless of priority? In which <em>file</em> is it? (Hint: it is not in <code>main_window.py</code>.)</p></div>
+</section>
+
+<!-- ===================================================== STEP 8 -->
+<section class="step">
+<div class="step-head"><div class="badge">8</div><h2 id="step-8">Create: the add-task dialog</h2></div>
+<p class="meta">About 60 minutes &middot; Goal: click &ldquo;+ Add task&rdquo;, fill a form, see it in the table. The <strong>C</strong> in CRUD, and your first signals and slots.</p>
+
+<div class="callout why"><span class="t">Why one dialog for add <em>and</em> edit</span>
+<p>Adding and editing need the same fields, same drop-downs and same validation. Two dialogs would mean two copies to keep in sync. So <code>TaskDialog</code> takes an <em>optional</em> task: <code>None</code> means &ldquo;new&rdquo;, a <code>Task</code> means &ldquo;edit this one&rdquo;. We type the edit-mode parts now so we only write this file once; they start working in step 9.</p></div>
+
+<h3>8.1 <code>ui/task_dialog.py</code></h3>
+<figure class="code"><figcaption><span>ui/task_dialog.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">from</span> PyQt6.QtCore <span class="k">import</span> QDate
+<span class="k">from</span> PyQt6.QtWidgets <span class="k">import</span> (
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QVBoxLayout,
+)
+
+<span class="k">import</span> config
+<span class="k">from</span> models.task <span class="k">import</span> Task
+
+
+<span class="k">class</span> <span class="f">TaskDialog</span>(QDialog):
+    <span class="s">&quot;&quot;&quot;One dialog used for BOTH &#x27;New task&#x27; and &#x27;Edit task&#x27;.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="f">__init__</span>(<span class="b">self</span>, parent=<span class="k">None</span>, task: Task | <span class="k">None</span> = <span class="k">None</span>):
+        <span class="b">super</span>().__init__(parent)
+        <span class="b">self</span>._editing = task  <span class="c"># None means we are creating</span>
+        <span class="b">self</span>.task_result: Task | <span class="k">None</span> = <span class="k">None</span>  <span class="c"># filled in when the user clicks Save</span>
+
+        <span class="b">self</span>.setWindowTitle(<span class="s">&quot;Edit task&quot;</span> <span class="k">if</span> task <span class="k">else</span> <span class="s">&quot;New task&quot;</span>)
+        <span class="b">self</span>.setMinimumWidth(<span class="n">420</span>)
+
+        <span class="c"># --- widgets -------------------------------------------------------</span>
+        <span class="b">self</span>.title_input = QLineEdit()
+        <span class="b">self</span>.title_input.setPlaceholderText(<span class="s">&quot;What needs to be done?&quot;</span>)
+
+        <span class="b">self</span>.description_input = QPlainTextEdit()
+        <span class="b">self</span>.description_input.setFixedHeight(<span class="n">90</span>)
+
+        <span class="b">self</span>.status_input = QComboBox()
+        <span class="b">self</span>.status_input.addItems(config.STATUSES)
+
+        <span class="b">self</span>.priority_input = QComboBox()
+        <span class="k">for</span> value, label <span class="k">in</span> config.PRIORITIES.items():
+            <span class="b">self</span>.priority_input.addItem(label, value)  <span class="c"># text shown, value stored</span>
+        <span class="b">self</span>.priority_input.setCurrentIndex(<span class="n">1</span>)  <span class="c"># Medium</span>
+
+        <span class="b">self</span>.has_due_input = QCheckBox(<span class="s">&quot;Set a due date&quot;</span>)
+        <span class="b">self</span>.due_input = QDateEdit(QDate.currentDate())
+        <span class="b">self</span>.due_input.setCalendarPopup(<span class="k">True</span>)
+        <span class="b">self</span>.due_input.setDisplayFormat(config.DATE_FORMAT)
+        <span class="b">self</span>.due_input.setEnabled(<span class="k">False</span>)
+        <span class="b">self</span>.has_due_input.toggled.connect(<span class="b">self</span>.due_input.setEnabled)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(<span class="b">self</span>._on_save)
+        buttons.rejected.connect(<span class="b">self</span>.reject)
+
+        <span class="c"># --- layout --------------------------------------------------------</span>
+        form = QFormLayout()
+        form.addRow(<span class="s">&quot;Title *&quot;</span>, <span class="b">self</span>.title_input)
+        form.addRow(<span class="s">&quot;Description&quot;</span>, <span class="b">self</span>.description_input)
+        form.addRow(<span class="s">&quot;Status&quot;</span>, <span class="b">self</span>.status_input)
+        form.addRow(<span class="s">&quot;Priority&quot;</span>, <span class="b">self</span>.priority_input)
+        form.addRow(<span class="b">self</span>.has_due_input, <span class="b">self</span>.due_input)
+
+        layout = QVBoxLayout(<span class="b">self</span>)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+
+        <span class="k">if</span> task:
+            <span class="b">self</span>._fill_form(task)
+
+    <span class="k">def</span> <span class="f">_fill_form</span>(<span class="b">self</span>, task: Task):
+        <span class="s">&quot;&quot;&quot;Copy an existing task into the widgets (edit mode).&quot;&quot;&quot;</span>
+        <span class="b">self</span>.title_input.setText(task.title)
+        <span class="b">self</span>.description_input.setPlainText(task.description)
+        <span class="b">self</span>.status_input.setCurrentText(task.status)
+        <span class="b">self</span>.priority_input.setCurrentIndex(<span class="b">self</span>.priority_input.findData(task.priority))
+        <span class="k">if</span> task.due_date:
+            <span class="b">self</span>.has_due_input.setChecked(<span class="k">True</span>)
+            <span class="b">self</span>.due_input.setDate(QDate.fromString(task.due_date, <span class="s">&quot;yyyy-MM-dd&quot;</span>))
+
+    <span class="k">def</span> <span class="f">_read_form</span>(<span class="b">self</span>) -&gt; Task:
+        <span class="s">&quot;&quot;&quot;Copy the widgets into a Task object.&quot;&quot;&quot;</span>
+        due = <span class="k">None</span>
+        <span class="k">if</span> <span class="b">self</span>.has_due_input.isChecked():
+            due = <span class="b">self</span>.due_input.date().toString(<span class="s">&quot;yyyy-MM-dd&quot;</span>)
+
+        <span class="k">return</span> Task(
+            id=<span class="b">self</span>._editing.id <span class="k">if</span> <span class="b">self</span>._editing <span class="k">else</span> <span class="k">None</span>,
+            title=<span class="b">self</span>.title_input.text().strip(),
+            description=<span class="b">self</span>.description_input.toPlainText().strip(),
+            status=<span class="b">self</span>.status_input.currentText(),
+            priority=<span class="b">self</span>.priority_input.currentData(),
+            due_date=due,
+        )
+
+    <span class="k">def</span> <span class="f">_on_save</span>(<span class="b">self</span>):
+        task = <span class="b">self</span>._read_form()
+        errors = task.validate()
+        <span class="k">if</span> errors:
+            QMessageBox.warning(<span class="b">self</span>, <span class="s">&quot;Please fix this&quot;</span>, <span class="s">&quot;\n&quot;</span>.join(errors))
+            <span class="k">return</span>  <span class="c"># keep the dialog open</span>
+        <span class="b">self</span>.task_result = task
+        <span class="b">self</span>.accept()</code></pre></figure>
+
+<h3>How the dialog works</h3>
+<ul>
+  <li><strong><code>QDialog.exec()</code></strong> shows the dialog <em>modally</em>: the main window is blocked until it closes. <code>exec()</code> returns <code>QDialog.DialogCode.Accepted</code> or <code>Rejected</code>.</li>
+  <li><strong>Signals and slots:</strong> <code>buttons.accepted.connect(self._on_save)</code> means &ldquo;when Save is clicked, call <code>_on_save</code>&rdquo;. <code>rejected</code> is wired to the built-in <code>reject()</code> which closes the dialog.</li>
+  <li><strong><code>has_due_input.toggled.connect(self.due_input.setEnabled)</code></strong> connects a signal straight to another widget's method: ticking the box enables the date picker. No code of ours is involved.</li>
+  <li><strong><code>addItem(label, value)</code> + <code>currentData()</code></strong>: a combo box can show &ldquo;High&rdquo; while storing <code>1</code> behind the scenes. <code>findData(1)</code> does the reverse lookup when we fill the form for editing.</li>
+  <li><strong><code>_read_form()</code> / <code>_fill_form()</code></strong> are the two directions of travel: widgets to Task, and Task to widgets.</li>
+  <li><strong><code>_on_save</code> validates, and does <em>not</em> call <code>accept()</code> if there are errors.</strong> The <code>return</code> keeps the dialog open so the user can fix the problem without retyping.</li>
+  <li><strong><code>self.task_result</code></strong> is how the dialog hands the finished <code>Task</code> back to the caller. (We avoid the name <code>result</code> because <code>QDialog</code> already has a method called that.)</li>
+  <li>The dialog <em>never touches the database</em>. It only produces a valid <code>Task</code>. The window decides what to do with it. Same layering idea, in miniature.</li>
+</ul>
+
+<h3>8.2 Wire it into <code>main_window.py</code></h3>
+<p><strong>a)</strong> Add one import:</p>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">edit</span><span class="hint">with the other imports</span></figcaption><pre><code><span class="k">import</span> config
+<span class="k">from</span> db <span class="k">import</span> task_repo
+<span class="k">from</span> ui.task_dialog <span class="k">import</span> TaskDialog   <span class="c"># &lt;-- add this line</span></code></pre></figure>
+<p><strong>b)</strong> Add the handler (inside the class):</p>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">add to class</span><span class="hint">inside class MainWindow</span></figcaption><pre><code>    <span class="k">def</span> <span class="f">add_task</span>(<span class="b">self</span>):
+        dialog = TaskDialog(<span class="b">self</span>)
+        <span class="k">if</span> dialog.exec() != QDialog.DialogCode.Accepted:
+            <span class="k">return</span>
+
+        <span class="k">try</span>:
+            task_repo.create(dialog.task_result)
+        <span class="k">except</span> sqlite3.Error <span class="k">as</span> exc:
+            <span class="b">self</span>._show_db_error(exc)
+            <span class="k">return</span>
+
+        <span class="b">self</span>.refresh()
+        <span class="b">self</span>.statusBar().showMessage(<span class="s">&quot;Task added&quot;</span>)</code></pre></figure>
+<p><strong>c)</strong> Create <code>_connect_signals</code>, the one method where every connection lives, so you can see all the wiring at a glance (inside the class):</p>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">add to class</span><span class="hint">below _build_ui</span></figcaption><pre><code>    <span class="k">def</span> <span class="f">_connect_signals</span>(<span class="b">self</span>):
+        <span class="s">&quot;&quot;&quot;Every button/field -&gt; method connection lives here.&quot;&quot;&quot;</span>
+        <span class="b">self</span>.add_button.clicked.connect(<span class="b">self</span>.add_task)</code></pre></figure>
+<p><strong>d)</strong> Call it from <code>__init__</code>:</p>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">edit</span><span class="hint">end of __init__</span></figcaption><pre><code>        <span class="b">self</span>._build_ui()
+        <span class="b">self</span>._connect_signals()   <span class="c"># &lt;-- add this line</span>
+        <span class="b">self</span>.refresh()</code></pre></figure>
+
+<ul>
+  <li><code>add_task</code> follows a pattern you will repeat in every handler: <em>get input, call the repository, handle errors, refresh the view</em>.</li>
+  <li>Note we pass a method <strong>without brackets</strong>: <code>connect(self.add_task)</code>. With brackets (<code>add_task()</code>) you would <em>call it right now</em> and connect its return value (<code>None</code>).</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<ol>
+  <li>Run <code>python main.py</code> and click <strong>+ Add task</strong>.</li>
+  <li>Click <strong>Save</strong> with an empty title: a warning appears and the dialog stays open.</li>
+  <li>Type a title, tick &ldquo;Set a due date&rdquo; (the date picker enables), choose High priority, Save.</li>
+  <li>The new task appears in the table, the status bar says <em>Task added</em>.</li>
+  <li>Close the app and reopen it: the task is still there.</li>
+</ol></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li><code>buttons.accepted.connect(self._on_save())</code> (brackets): misbehaves at start-up. It runs <code>_on_save</code> immediately (a validation warning pops up before the dialog even shows) and then tries to connect <code>None</code>.</li>
+  <li><code>QDialogButtonBox.Save</code> (PyQt5 style) raises <code>AttributeError</code>. Use <code>QDialogButtonBox.StandardButton.Save</code>.</li>
+  <li>Forgetting <code>return</code> after the warning: the dialog closes with invalid data.</li>
+  <li><code>QVBoxLayout()</code> without <code>(self)</code>: nothing shows, because the layout was never attached to the dialog.</li>
+  <li>Passing <code>self</code> as parent in <code>TaskDialog(self)</code> matters: it centres the dialog over the main window and keeps it on top.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 8</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(ui): add-task dialog (Create)&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>What is the difference between <code>clicked.connect(self.add_task)</code> and <code>clicked.connect(self.add_task())</code>? Try the second one, read the error, then undo it.</p></div>
+</section>
+
+<!-- ===================================================== STEP 9 -->
+<section class="step">
+<div class="step-head"><div class="badge">9</div><h2 id="step-9">Update: edit a task</h2></div>
+<p class="meta">About 40 minutes &middot; Goal: select a row, press Edit (or double-click), change it, save. The <strong>U</strong> in CRUD.</p>
+
+<div class="callout why"><span class="t">Why reload from the database before editing</span>
+<p>The table on screen is a <em>display copy</em>: it only shows a few columns, as text. The database is the truth. So instead of trying to rebuild a <code>Task</code> from table cells, we only read the <strong>id</strong> from the selected row and ask the repository for the real, complete task. This also handles &ldquo;someone deleted it in the meantime&rdquo;.</p></div>
+
+<h3>9.1 Add three methods to <code>MainWindow</code></h3>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">add to class</span><span class="hint">inside class MainWindow</span></figcaption><pre><code>    <span class="k">def</span> <span class="f">_selected_id</span>(<span class="b">self</span>):
+        rows = <span class="b">self</span>.table.selectionModel().selectedRows()
+        <span class="k">if</span> <span class="k">not</span> rows:
+            <span class="k">return</span> <span class="k">None</span>
+        <span class="k">return</span> <span class="b">int</span>(<span class="b">self</span>.table.item(rows[<span class="n">0</span>].row(), <span class="n">0</span>).text())
+
+    <span class="k">def</span> <span class="f">_update_buttons</span>(<span class="b">self</span>):
+        has_selection = <span class="b">self</span>._selected_id() <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>
+        <span class="b">self</span>.edit_button.setEnabled(has_selection)
+        <span class="b">self</span>.delete_button.setEnabled(has_selection)
+
+    <span class="k">def</span> <span class="f">edit_task</span>(<span class="b">self</span>):
+        task_id = <span class="b">self</span>._selected_id()
+        <span class="k">if</span> task_id <span class="k">is</span> <span class="k">None</span>:
+            <span class="k">return</span>
+
+        <span class="k">try</span>:
+            task = task_repo.get_by_id(task_id)
+            <span class="k">if</span> task <span class="k">is</span> <span class="k">None</span>:
+                QMessageBox.warning(<span class="b">self</span>, <span class="s">&quot;Not found&quot;</span>, <span class="s">&quot;That task no longer exists.&quot;</span>)
+                <span class="b">self</span>.refresh()
+                <span class="k">return</span>
+
+            dialog = TaskDialog(<span class="b">self</span>, task)
+            <span class="k">if</span> dialog.exec() != QDialog.DialogCode.Accepted:
+                <span class="k">return</span>
+            task_repo.update(dialog.task_result)
+        <span class="k">except</span> sqlite3.Error <span class="k">as</span> exc:
+            <span class="b">self</span>._show_db_error(exc)
+            <span class="k">return</span>
+
+        <span class="b">self</span>.refresh()
+        <span class="b">self</span>.statusBar().showMessage(<span class="s">&quot;Task updated&quot;</span>)</code></pre></figure>
+
+<h3>9.2 Connect three more signals</h3>
+<p>Extend <code>_connect_signals</code>:</p>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">edit</span><span class="hint">inside _connect_signals</span></figcaption><pre><code>        <span class="b">self</span>.add_button.clicked.connect(<span class="b">self</span>.add_task)
+        <span class="b">self</span>.edit_button.clicked.connect(<span class="b">self</span>.edit_task)                                <span class="c"># &lt;-- new</span>
+        <span class="b">self</span>.table.doubleClicked.connect(<span class="b">self</span>.edit_task)                                <span class="c"># &lt;-- new</span>
+        <span class="b">self</span>.table.itemSelectionChanged.connect(<span class="b">self</span>._update_buttons)                   <span class="c"># &lt;-- new</span></code></pre></figure>
+
+<ul>
+  <li><code>_selected_id()</code> asks the table's selection model for the selected rows; it returns <code>None</code> when nothing is selected. Column 0 holds the id, which is why we show the ID column.</li>
+  <li><code>_update_buttons()</code> enables Edit and Delete only when a row is selected. It runs every time the selection changes (<code>itemSelectionChanged</code>), including when <code>refresh()</code> clears the table.</li>
+  <li><strong>Signals carry data.</strong> <code>doubleClicked</code> sends the index of the clicked cell, and <code>edit_task</code> takes no parameters. PyQt quietly <em>drops</em> any arguments the slot cannot accept, so connecting the bare method just works. (I tested this; it is the same reason <code>button.clicked.connect(self.add_task)</code> works even though <code>clicked</code> sends a <code>checked</code> flag.)</li>
+  <li>The edit handler reuses <code>TaskDialog</code>, passing the loaded task. The dialog fills itself; on Save we call <code>task_repo.update(dialog.task_result)</code>. The id travels inside the task, so the right row is updated.</li>
+  <li>The single <code>try</code> block covers both the read and the write. If <code>get_by_id</code> returns <code>None</code> we tell the user and refresh instead of crashing on <code>None</code>.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<ol>
+  <li>On start-up Edit and Delete are greyed out. Click a row: both enable.</li>
+  <li>Click <strong>Edit</strong>: the dialog opens <em>pre-filled</em> with that task's data (check status, priority, and the due date tick).</li>
+  <li>Change the title and status, Save. The row updates and the status bar says <em>Task updated</em>.</li>
+  <li>Double-click a row: same dialog. Press Cancel: nothing changes.</li>
+</ol></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li>Editing creates a <em>new</em> task instead of changing the old one: the id was lost. Check that <code>_read_form</code> copies <code>self._editing.id</code>.</li>
+  <li>Edit does nothing on double-click: check you wrote <code>self.edit_task</code> <em>without</em> brackets, and that the line is inside <code>_connect_signals</code>.</li>
+  <li>Dialog opens blank: you wrote <code>TaskDialog(self)</code> instead of <code>TaskDialog(self, task)</code>.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 9</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(ui): edit a task (Update)&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Open the app twice side by side. Delete a task in window A, then press Edit on that same task in window B (without refreshing). What happens? Which line makes it graceful?</p></div>
+</section>
+
+<!-- ===================================================== STEP 10 -->
+<section class="step">
+<div class="step-head"><div class="badge">10</div><h2 id="step-10">Delete, with a confirmation</h2></div>
+<p class="meta">About 25 minutes &middot; Goal: remove the selected task, but only after asking. The <strong>D</strong> in CRUD.</p>
+
+<div class="callout why"><span class="t">Why confirm</span>
+<p>Delete is the one operation users cannot take back. A one-line confirmation costs half a second; a lost task costs trust. The rule of thumb: <em>the more destructive the action, the more deliberate the interface</em>. We also make <strong>No the default button</strong>, so a reflexive Enter key press does the safe thing.</p></div>
+
+<h3>10.1 Add the handler</h3>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">add to class</span><span class="hint">inside class MainWindow</span></figcaption><pre><code>    <span class="k">def</span> <span class="f">delete_task</span>(<span class="b">self</span>):
+        task_id = <span class="b">self</span>._selected_id()
+        <span class="k">if</span> task_id <span class="k">is</span> <span class="k">None</span>:
+            <span class="k">return</span>
+
+        row = <span class="b">self</span>.table.selectionModel().selectedRows()[<span class="n">0</span>].row()
+        title = <span class="b">self</span>.table.item(row, <span class="n">1</span>).text()
+
+        answer = QMessageBox.question(
+            <span class="b">self</span>,
+            <span class="s">&quot;Delete task&quot;</span>,
+            <span class="s">f&quot;Delete \&quot;{title}\&quot;?\nThis cannot be undone.&quot;</span>,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,  <span class="c"># default button = the safe one</span>
+        )
+        <span class="k">if</span> answer != QMessageBox.StandardButton.Yes:
+            <span class="k">return</span>
+
+        <span class="k">try</span>:
+            task_repo.delete(task_id)
+        <span class="k">except</span> sqlite3.Error <span class="k">as</span> exc:
+            <span class="b">self</span>._show_db_error(exc)
+            <span class="k">return</span>
+
+        <span class="b">self</span>.refresh()
+        <span class="b">self</span>.statusBar().showMessage(<span class="s">&quot;Task deleted&quot;</span>)</code></pre></figure>
+
+<h3>10.2 Connect the button</h3>
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">edit</span><span class="hint">inside _connect_signals</span></figcaption><pre><code>        <span class="b">self</span>.edit_button.clicked.connect(<span class="b">self</span>.edit_task)
+        <span class="b">self</span>.delete_button.clicked.connect(<span class="b">self</span>.delete_task)   <span class="c"># &lt;-- new</span></code></pre></figure>
+
+<ul>
+  <li><code>QMessageBox.question(...)</code> is a ready-made modal Yes/No dialog. It <em>returns which button was pressed</em>, so we compare the answer to <code>StandardButton.Yes</code>.</li>
+  <li>The last argument (<code>StandardButton.No</code>) is the <strong>default button</strong>, the one that fires on Enter.</li>
+  <li>We read the title from the table only to <em>show it in the question</em>. That is display text, which is a perfectly good use of the view. The delete itself uses the id.</li>
+  <li><code>\"</code> inside the f-string is an escaped double quote, so the message reads: Delete &ldquo;Buy milk&rdquo;?</li>
+  <li>The early <code>return</code>s keep the happy path flat. This style (&ldquo;guard clauses&rdquo;) avoids deeply nested <code>if</code>s.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<ol>
+  <li>Select a task, click <strong>Delete</strong>, choose <strong>No</strong>: the task stays.</li>
+  <li>Click Delete again and choose <strong>Yes</strong>: it disappears, the status bar says <em>Task deleted</em>, and Edit/Delete grey out again (no selection).</li>
+  <li>Restart the app: it is still gone.</li>
+</ol></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li>Comparing against <code>QMessageBox.Yes</code> (PyQt5 style): <code>AttributeError</code>. Use <code>QMessageBox.StandardButton.Yes</code>.</li>
+  <li>Deleting by <em>row number</em> instead of by id. Row numbers change whenever the table is filtered or reloaded; ids do not.</li>
+  <li>Forgetting the final <code>self.refresh()</code>: the database is correct but the screen still shows the deleted task.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 10</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(ui): delete with confirmation&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>You now have all four CRUD verbs. Look at <code>add_task</code>, <code>edit_task</code> and <code>delete_task</code> side by side. What do the three have in common? <em>(Get input, call the repository, handle errors, refresh. If you can see that pattern, you can build any CRUD screen.)</em></p></div>
+</section>
+
+<!-- ===================================================== STEP 11 -->
+<section class="step">
+<div class="step-head"><div class="badge">11</div><h2 id="step-11">Search box and status filter</h2></div>
+<p class="meta">About 15 minutes &middot; Goal: the table narrows as you type or pick a status. Two lines of code, because the groundwork is already done.</p>
+
+<div class="callout why"><span class="t">Why this is so short</span>
+<p>The repository already filters (step 5), and <code>refresh()</code> already reads the search box and the drop-down (step 7). The only missing piece is <em>&ldquo;call <code>refresh()</code> when either changes&rdquo;</em>. That is what good layering buys you: a feature that costs two lines.</p></div>
+
+<figure class="code"><figcaption><span>ui/main_window.py</span><span class="tag edit">edit</span><span class="hint">inside _connect_signals, at the end</span></figcaption><pre><code>        <span class="b">self</span>.table.itemSelectionChanged.connect(<span class="b">self</span>._update_buttons)
+        <span class="b">self</span>.search_input.textChanged.connect(<span class="b">self</span>.refresh)             <span class="c"># &lt;-- new</span>
+        <span class="b">self</span>.status_filter.currentIndexChanged.connect(<span class="b">self</span>.refresh)    <span class="c"># &lt;-- new</span></code></pre></figure>
+
+<ul>
+  <li><code>textChanged</code> fires on <em>every keystroke</em> and sends the new text. <code>currentIndexChanged</code> fires when the drop-down changes and sends the new index. <code>refresh</code> takes no parameters, so PyQt drops the extra value, and <code>refresh</code> re-reads the widgets itself.</li>
+  <li><strong>Gotcha:</strong> if you ever give a slot an <em>optional</em> parameter, like <code>def refresh(self, force=False)</code>, PyQt <em>will</em> pass the signal's value into it. The search text would land in <code>force</code>. That is one more reason <code>refresh()</code> takes nothing.</li>
+  <li>Both filters combine, because <code>list_all(search, status)</code> adds <code>AND</code> clauses.</li>
+  <li>Reloading on every keystroke is perfectly fine for thousands of rows. For a huge table you would add a short delay (&ldquo;debounce&rdquo;); see the stretch goals.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<ol>
+  <li>Type part of a title: the table narrows live. Clear the box (the small &times;): everything returns.</li>
+  <li>Pick <em>Done</em> in the drop-down: only done tasks show. Pick <em>All statuses</em>: all return.</li>
+  <li>Combine them: type <code>buy</code> with <em>Done</em> selected. The status bar count matches the rows.</li>
+  <li>Search for <code>'; DROP TABLE tasks; --</code>. Nothing bad happens, the list is simply empty.</li>
+</ol></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li>Writing <code>connect(self.refresh())</code> with brackets: it runs once at start-up and connects nothing.</li>
+  <li>Filtering the <em>table widget</em> (hiding rows) instead of re-querying. It appears to work until you add pagination or a large dataset. Filter in SQL.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 11</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;feat(ui): search box and status filter&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Add a <code>print("refresh called")</code> at the top of <code>refresh()</code> and type &ldquo;hello&rdquo; in the search box. How many times does it print? Why? (Remove the print afterwards.)</p></div>
+</section>
+
+<!-- ===================================================== STEP 12 -->
+<section class="step">
+<div class="step-head"><div class="badge">12</div><h2 id="step-12">Style it with QSS</h2></div>
+<p class="meta">About 30 minutes &middot; Goal: make it look intentional, without touching any logic.</p>
+
+<div class="callout why"><span class="t">Why last</span>
+<p>Appearance is the cheapest thing to change and the most tempting thing to start with. By styling last we guarantee the app <em>works</em> before it <em>looks nice</em>, and we keep the CSS-like text in its own file so nothing in the logic knows how it looks.</p></div>
+
+<h3>12.1 <code>ui/styles.py</code></h3>
+<figure class="code"><figcaption><span>ui/styles.py</span><span class="tag new">new file</span></figcaption><pre><code>STYLESHEET = <span class="s">&quot;&quot;&quot;
+QWidget {
+    color: #1f2430;
+    font-size: 14px;
+}
+QMainWindow, QDialog, QMessageBox {
+    background: #f5f6fa;
+}
+
+QLineEdit, QComboBox, QPlainTextEdit, QDateEdit {
+    background: white;
+    border: 1px solid #c4c9da;
+    border-radius: 6px;
+    padding: 5px 8px;
+}
+QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus, QDateEdit:focus {
+    border: 1px solid #4f6df5;
+}
+
+QPushButton {
+    background: white;
+    border: 1px solid #c4c9da;
+    border-radius: 6px;
+    padding: 6px 14px;
+}
+QPushButton:hover    { background: #eef1fb; }
+QPushButton:disabled { color: #9aa0b5; background: #f0f1f6; }
+
+QPushButton#primary {
+    background: #4f6df5;
+    border-color: #4f6df5;
+    color: white;
+    font-weight: bold;
+}
+QPushButton#primary:hover { background: #3d5ae0; }
+QPushButton#danger { color: #c0392b; border-color: #e3b1ab; }
+
+QTableWidget {
+    background: white;
+    alternate-background-color: #f0f3fa;
+    gridline-color: #e1e4ee;
+    border: 1px solid #d5d9e5;
+    selection-background-color: #4f6df5;
+    selection-color: white;
+}
+QHeaderView::section {
+    background: #e8ebf5;
+    border: none;
+    padding: 6px;
+    font-weight: bold;
+}
+QStatusBar { color: #5b6275; }
+&quot;&quot;&quot;</span></code></pre></figure>
+
+<h3>12.2 <code>main.py</code>: apply the style</h3>
+<p>Replace your <code>main.py</code> with this version:</p>
+<figure class="code"><figcaption><span>main.py</span><span class="tag edit">replace whole file</span></figcaption><pre><code><span class="k">import</span> sys
+
+<span class="k">from</span> PyQt6.QtCore <span class="k">import</span> Qt
+<span class="k">from</span> PyQt6.QtWidgets <span class="k">import</span> QApplication
+
+<span class="k">from</span> db.schema <span class="k">import</span> init_db
+<span class="k">from</span> ui.main_window <span class="k">import</span> MainWindow
+<span class="k">from</span> ui.styles <span class="k">import</span> STYLESHEET
+
+
+<span class="k">def</span> <span class="f">main</span>():
+    init_db()  <span class="c"># make sure the table exists BEFORE the UI asks for data</span>
+
+    app = QApplication(sys.argv)
+    app.setStyle(<span class="s">&quot;Fusion&quot;</span>)
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)  <span class="c"># needs Qt 6.8+</span>
+    app.setStyleSheet(STYLESHEET)
+
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
+
+
+<span class="k">if</span> __name__ == <span class="s">&quot;__main__&quot;</span>:
+    main()</code></pre></figure>
+
+<ul>
+  <li><strong>QSS</strong> (Qt Style Sheets) is deliberately close to CSS: selectors, braces, <code>property: value;</code>.</li>
+  <li><code>QPushButton#primary</code> targets the button whose <code>objectName</code> is <code>primary</code>: the label we set back in step 6. That is the payoff for that unexplained <code>setObjectName</code> line.</li>
+  <li><code>QWidget { color: ... }</code> sets a default text colour for <em>everything</em>, and more specific rules override it.</li>
+  <li><code>app.setStyle("Fusion")</code> picks Qt's cross-platform base style, so the app looks the same on Windows, macOS and Linux.</li>
+  <li><code>setColorScheme(Qt.ColorScheme.Light)</code> (Qt 6.8+) forces light mode. Without it, a computer set to dark mode would give light-coloured text on our light background. (This is why <code>requirements.txt</code> asked for 6.8+.)</li>
+  <li>The &ldquo;status-bar messages&rdquo; part of this commit was already built into steps 7 to 10, so there is nothing more to add.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<p>Run <code>python main.py</code>. The Add button is solid blue and bold, Delete has red text, rows alternate colours, the selected row is blue with white text, and the dialog (open it!) matches the main window.</p></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li><strong>A syntax error in QSS fails silently:</strong> the whole stylesheet is ignored and Qt only prints <em>Could not parse stylesheet</em> in the terminal. If nothing changed, look at the console. A missing <code>;</code> or <code>}</code> is the usual cause.</li>
+  <li><code>setColorScheme</code> raising <code>AttributeError</code>: your PyQt6 is older than 6.8. Upgrade with <code>pip install -U PyQt6</code>.</li>
+  <li>Calling <code>setStyleSheet</code> <em>after</em> <code>window.show()</code> works but flickers. Apply it before showing.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 12</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;style: QSS theme and polish, status-bar messages&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Search <code>styles.py</code> for <code>#4f6df5</code>. It appears several times. Change every one to another colour and re-run: everything that was blue changes. What does that tell you about repeated values? (They want to be named constants, which is a stretch goal.)</p></div>
+</section>
+
+<!-- ===================================================== STEP 13 -->
+<section class="step">
+<div class="step-head"><div class="badge">13</div><h2 id="step-13">Write the tests</h2></div>
+<p class="meta">About 45 minutes &middot; Goal: a safety net, so you can change code later without fear.</p>
+
+<div class="callout why"><span class="t">Why tests, and why only the data layer</span>
+<p>You have been checking your work by hand with one-liners and by clicking. A test is the same check, saved so you can repeat it in one second forever. We test the repository and the model because they are fast, need no window, and hold the rules that matter most. Testing GUI code is a skill for another day.</p></div>
+
+<h3>13.1 Install pytest</h3>
+<p>Update <code>requirements.txt</code>:</p>
+<figure class="code"><figcaption><span>requirements.txt</span><span class="tag edit">edit</span></figcaption><pre><code>PyQt6&gt;=6.8
+pytest&gt;=8.0</code></pre></figure>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>pip install -r requirements.txt</code></pre></figure>
+
+<h3>13.2 <code>pytest.ini</code></h3>
+<figure class="code"><figcaption><span>pytest.ini</span><span class="tag new">new file</span></figcaption><pre><code>[pytest]
+pythonpath = .
+testpaths = tests</code></pre></figure>
+<p><code>pythonpath = .</code> lets the tests <code>import config</code> and <code>from db import ...</code> from the project root.</p>
+
+<h3>13.3 <code>tests/test_task_repo.py</code></h3>
+<figure class="code"><figcaption><span>tests/test_task_repo.py</span><span class="tag new">new file</span></figcaption><pre><code><span class="k">import</span> pytest
+
+<span class="k">import</span> config
+<span class="k">from</span> db <span class="k">import</span> task_repo
+<span class="k">from</span> db.schema <span class="k">import</span> init_db
+<span class="k">from</span> models.task <span class="k">import</span> Task
+
+
+@pytest.fixture(autouse=<span class="k">True</span>)
+<span class="k">def</span> <span class="f">temp_db</span>(tmp_path, monkeypatch):
+    <span class="s">&quot;&quot;&quot;Every test gets its own empty database file.&quot;&quot;&quot;</span>
+    monkeypatch.setattr(config, <span class="s">&quot;DB_PATH&quot;</span>, tmp_path / <span class="s">&quot;test.db&quot;</span>)
+    init_db()
+
+
+<span class="k">def</span> <span class="f">test_create_and_get</span>():
+    new_id = task_repo.create(Task(title=<span class="s">&quot;Write tests&quot;</span>, priority=<span class="n">1</span>))
+    task = task_repo.get_by_id(new_id)
+    <span class="k">assert</span> task <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>
+    <span class="k">assert</span> task.title == <span class="s">&quot;Write tests&quot;</span>
+    <span class="k">assert</span> task.priority == <span class="n">1</span>
+    <span class="k">assert</span> task.status == <span class="s">&quot;Todo&quot;</span>
+
+
+<span class="k">def</span> <span class="f">test_get_missing_returns_none</span>():
+    <span class="k">assert</span> task_repo.get_by_id(<span class="n">999</span>) <span class="k">is</span> <span class="k">None</span>
+
+
+<span class="k">def</span> <span class="f">test_update</span>():
+    task_id = task_repo.create(Task(title=<span class="s">&quot;Old title&quot;</span>))
+    task = task_repo.get_by_id(task_id)
+    task.title = <span class="s">&quot;New title&quot;</span>
+    task.status = <span class="s">&quot;Done&quot;</span>
+    <span class="k">assert</span> task_repo.update(task) <span class="k">is</span> <span class="k">True</span>
+    <span class="k">assert</span> task_repo.get_by_id(task_id).title == <span class="s">&quot;New title&quot;</span>
+    <span class="k">assert</span> task_repo.get_by_id(task_id).status == <span class="s">&quot;Done&quot;</span>
+
+
+<span class="k">def</span> <span class="f">test_delete</span>():
+    task_id = task_repo.create(Task(title=<span class="s">&quot;Temporary&quot;</span>))
+    <span class="k">assert</span> task_repo.delete(task_id) <span class="k">is</span> <span class="k">True</span>
+    <span class="k">assert</span> task_repo.get_by_id(task_id) <span class="k">is</span> <span class="k">None</span>
+    <span class="k">assert</span> task_repo.delete(task_id) <span class="k">is</span> <span class="k">False</span>  <span class="c"># already gone</span>
+
+
+<span class="k">def</span> <span class="f">test_search_and_filter</span>():
+    task_repo.create(Task(title=<span class="s">&quot;Buy milk&quot;</span>))
+    task_repo.create(Task(title=<span class="s">&quot;Buy bread&quot;</span>, status=<span class="s">&quot;Done&quot;</span>))
+    task_repo.create(Task(title=<span class="s">&quot;Call mum&quot;</span>, description=<span class="s">&quot;about milk&quot;</span>))
+
+    <span class="k">assert</span> <span class="b">len</span>(task_repo.list_all()) == <span class="n">3</span>
+    <span class="k">assert</span> <span class="b">len</span>(task_repo.list_all(search=<span class="s">&quot;buy&quot;</span>)) == <span class="n">2</span>
+    <span class="k">assert</span> <span class="b">len</span>(task_repo.list_all(search=<span class="s">&quot;milk&quot;</span>)) == <span class="n">2</span>  <span class="c"># title OR description</span>
+    <span class="k">assert</span> <span class="b">len</span>(task_repo.list_all(status=<span class="s">&quot;Done&quot;</span>)) == <span class="n">1</span>
+    <span class="k">assert</span> <span class="b">len</span>(task_repo.list_all(search=<span class="s">&quot;buy&quot;</span>, status=<span class="s">&quot;Done&quot;</span>)) == <span class="n">1</span>
+
+
+<span class="k">def</span> <span class="f">test_sql_injection_text_is_just_text</span>():
+    task_repo.create(Task(title=<span class="s">&quot;x&#x27;); DROP TABLE tasks; --&quot;</span>))
+    <span class="k">assert</span> <span class="b">len</span>(task_repo.list_all()) == <span class="n">1</span>  <span class="c"># table still exists</span>
+
+
+@pytest.mark.parametrize(
+    <span class="s">&quot;task&quot;</span>,
+    [
+        Task(title=<span class="s">&quot;   &quot;</span>),
+        Task(title=<span class="s">&quot;x&quot;</span> * <span class="n">101</span>),
+        Task(title=<span class="s">&quot;ok&quot;</span>, status=<span class="s">&quot;Nope&quot;</span>),
+        Task(title=<span class="s">&quot;ok&quot;</span>, priority=<span class="n">9</span>),
+        Task(title=<span class="s">&quot;ok&quot;</span>, due_date=<span class="s">&quot;31/12/2026&quot;</span>),
+    ],
+)
+<span class="k">def</span> <span class="f">test_invalid_tasks_are_rejected</span>(task):
+    <span class="k">assert</span> task.validate() != []
+
+
+<span class="k">def</span> <span class="f">test_valid_task_has_no_errors</span>():
+    <span class="k">assert</span> Task(title=<span class="s">&quot;ok&quot;</span>, due_date=<span class="s">&quot;2026-12-31&quot;</span>).validate() == []</code></pre></figure>
+
+<ul>
+  <li><strong>The fixture</strong> (<code>@pytest.fixture(autouse=True)</code>) runs before <em>every</em> test. <code>tmp_path</code> is a fresh temporary folder, and <code>monkeypatch.setattr(config, "DB_PATH", ...)</code> points the app at a brand-new database file inside it for the duration of that test, then puts the old value back. Your real <code>todo.db</code> is never touched.</li>
+  <li>This only works because in step 2 <code>connection.py</code> reads <code>config.DB_PATH</code> <em>when called</em>. Good structure made testing easy.</li>
+  <li><strong>Why not <code>:memory:</code>?</strong> Every new connection to <code>:memory:</code> is a separate, empty database, and our design opens a new connection per operation. Each call would see nothing.</li>
+  <li><code>assert</code> is all you need; pytest explains the failure for you.</li>
+  <li><code>@pytest.mark.parametrize</code> runs the same test body for five different bad tasks and reports each separately.</li>
+  <li><code>test_sql_injection_text_is_just_text</code> proves the rule from step 4: hostile text is stored as text and the table survives.</li>
+  <li>Test names are sentences about behaviour. When one fails you can read what broke without opening the file.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>pytest</code></pre></figure>
+<figure class="code"><figcaption><span>output</span></figcaption><pre><code>............                                                             [100%]
+12 passed in 0.35s</code></pre></figure>
+<p><strong>Now break something on purpose:</strong> in <code>delete()</code> change <code>cur.rowcount &gt; 0</code> to <code>True</code> and run <code>pytest</code> again. <code>test_delete</code> fails and shows you exactly which assertion. Fix it and see green again. A test you have never seen fail is a test you cannot trust.</p></div>
+
+<div class="callout warn"><span class="t">Common mistakes</span>
+<ul>
+  <li><code>ModuleNotFoundError: No module named 'config'</code> in pytest: <code>pytest.ini</code> is missing, misspelled, or not in the project root.</li>
+  <li>Tests share state: forgetting the fixture means tests run against your real <code>todo.db</code> and depend on each other's leftovers.</li>
+  <li>Naming the file <code>task_repo_test.py</code> or the functions <code>check_...</code>: pytest only collects <code>test_*.py</code> files and <code>test_*</code> functions.</li>
+</ul></div>
+
+<div class="callout commit"><span class="t">Commit 13</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;test: repository and validation tests&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">Check yourself</span>
+<p>Write one more test of your own: <em>updating a task id that does not exist returns <code>False</code></em>. Watch it pass first time, then ask yourself whether that proves anything. (Break the code to find out.)</p></div>
+</section>
+
+<!-- ===================================================== STEP 14 -->
+<section class="step">
+<div class="step-head"><div class="badge">14</div><h2 id="step-14">README and the final tidy</h2></div>
+<p class="meta">About 20 minutes &middot; Goal: a stranger can clone your repo and run the app in two minutes.</p>
+
+<div class="callout why"><span class="t">Why</span>
+<p>Code nobody can run is code nobody can judge. The README is the front door of your project, and writing it also tests your own setup instructions.</p></div>
+
+<h3>14.1 Write <code>README.md</code> in your own words</h3>
+<p>Use this skeleton. Fill every section in your own words, and do not leave a placeholder behind:</p>
+<figure class="code"><figcaption><span>README.md</span><span class="tag new">new file</span><span class="hint">adapt, do not copy blindly</span></figcaption><pre><code># Todo Manager
+
+One sentence: what the app does and what it is built with.
+
+## Features
+- bullet list of what a user can do
+
+## Setup
+1. Create and activate a virtual environment
+2. pip install -r requirements.txt
+
+## Run
+python main.py
+
+## Test
+pytest
+
+## Project layout
+Short tree + one line on each layer (ui / db / models).
+
+## What I learned
+2-3 honest sentences: what was hardest, what you would do differently.</code></pre></figure>
+
+<h3>14.2 Final tidy</h3>
+<ul>
+  <li><code>git status</code> is clean and <code>todo.db</code> is not tracked.</li>
+  <li>No leftover <code>print()</code> debugging, no commented-out code, no unused variables.</li>
+  <li><code>git log --oneline</code> shows your 14 commits, in order, with the exact messages.</li>
+  <li>Clone your own repo into a new folder, follow <em>only your README</em>, and run the app. If you get stuck, the README is wrong. Fix it.</li>
+</ul>
+
+<div class="callout verify"><span class="t">Run and verify</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git log --oneline</code></pre></figure>
+<p>Fourteen lines, newest first, reading like a story from <em>docs: README</em> back to <em>chore: init repo</em>.</p></div>
+
+<div class="callout commit"><span class="t">Commit 14</span>
+<figure class="code"><figcaption><span>terminal</span><span class="tag run">run</span></figcaption><pre><code>git add .
+git commit -m &quot;docs: README with run instructions&quot;</code></pre></figure></div>
+
+<div class="callout check"><span class="t">You are done with the build</span>
+<p>Now run the self-review in the <a href="#review">Review section</a> before sending it to me.</p></div>
+</section>
+
+<h2 id="checklist">Master checklist</h2>
+<p>One group per commit. Tick items as you finish them; your ticks are saved in this browser, and the progress bar in the sidebar follows along. A group is only finished when it is <strong>committed with the exact message</strong> shown.</p>
+<p><button class="reset-btn" id="reset-checklist" type="button">Reset all ticks</button></p>
+<div class="progress-box"><div class="bar"><i class="js-bar"></i></div><small class="js-pct"></small></div>
+<div class="cl-group"><header><b>#1</b><code>chore: init repo, venv, requirements, .gitignore, folder skeleton</code><span>0 / 6</span></header><ul><li><label><input type="checkbox" data-id="c1-1"><span>Created the <code>todo_app/</code> folder and ran <code>git init</code></span></label></li><li><label><input type="checkbox" data-id="c1-2"><span>Created and activated a virtual environment</span></label></li><li><label><input type="checkbox" data-id="c1-3"><span>Wrote <code>requirements.txt</code> and ran <code>pip install -r requirements.txt</code></span></label></li><li><label><input type="checkbox" data-id="c1-4"><span><code>python -c "from PyQt6.QtWidgets import QApplication"</code> runs without errors</span></label></li><li><label><input type="checkbox" data-id="c1-5"><span>Wrote <code>.gitignore</code> and created <code>db/</code>, <code>models/</code>, <code>ui/</code> with empty <code>__init__.py</code> files</span></label></li><li><label><input type="checkbox" data-id="c1-6"><span>Committed with the exact message above</span></label></li></ul></div>
+<div class="cl-group"><header><b>#2</b><code>feat(db): connection helper and schema/init_db</code><span>0 / 6</span></header><ul><li><label><input type="checkbox" data-id="c2-1"><span>Typed <code>config.py</code> (constants live in ONE place)</span></label></li><li><label><input type="checkbox" data-id="c2-2"><span>Typed <code>db/connection.py</code> and can explain what the context manager does on error</span></label></li><li><label><input type="checkbox" data-id="c2-3"><span>Typed <code>db/schema.py</code>; running <code>init_db()</code> creates <code>todo.db</code></span></label></li><li><label><input type="checkbox" data-id="c2-4"><span>Checked the <code>tasks</code> table exists with the <code>sqlite3</code> one-liner</span></label></li><li><label><input type="checkbox" data-id="c2-5"><span><code>todo.db</code> does NOT show up in <code>git status</code></span></label></li><li><label><input type="checkbox" data-id="c2-6"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#3</b><code>feat(models): Task dataclass and validation</code><span>0 / 4</span></header><ul><li><label><input type="checkbox" data-id="c3-1"><span>Typed <code>models/task.py</code> with the <code>Task</code> dataclass</span></label></li><li><label><input type="checkbox" data-id="c3-2"><span><code>validate()</code> returns a list of messages, never raises</span></label></li><li><label><input type="checkbox" data-id="c3-3"><span>Tried one valid and one invalid task by hand in the terminal</span></label></li><li><label><input type="checkbox" data-id="c3-4"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#4</b><code>feat(db): task repository - create and read</code><span>0 / 6</span></header><ul><li><label><input type="checkbox" data-id="c4-1"><span><code>create()</code> returns the new id</span></label></li><li><label><input type="checkbox" data-id="c4-2"><span><code>get_by_id()</code> returns a <code>Task</code> or <code>None</code></span></label></li><li><label><input type="checkbox" data-id="c4-3"><span><code>list_all()</code> returns a list of <code>Task</code> objects</span></label></li><li><label><input type="checkbox" data-id="c4-4"><span>Every query uses <code>?</code> placeholders; there is no value inside an f-string SQL</span></label></li><li><label><input type="checkbox" data-id="c4-5"><span>Ran the verification one-liner and saw the expected output</span></label></li><li><label><input type="checkbox" data-id="c4-6"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#5</b><code>feat(db): update, delete and search/filter in repo</code><span>0 / 4</span></header><ul><li><label><input type="checkbox" data-id="c5-1"><span><code>update()</code> and <code>delete()</code> return <code>True</code>/<code>False</code> based on <code>rowcount</code></span></label></li><li><label><input type="checkbox" data-id="c5-2"><span>Replaced <code>list_all()</code> with the search + status filter version</span></label></li><li><label><input type="checkbox" data-id="c5-3"><span>Tried the filters by hand with a few rows</span></label></li><li><label><input type="checkbox" data-id="c5-4"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#6</b><code>feat(ui): main window shell with empty table</code><span>0 / 4</span></header><ul><li><label><input type="checkbox" data-id="c6-1"><span>Typed <code>ui/main_window.py</code> (shell) and <code>main.py</code></span></label></li><li><label><input type="checkbox" data-id="c6-2"><span><code>python main.py</code> opens a window with an empty table</span></label></li><li><label><input type="checkbox" data-id="c6-3"><span>Edit and Delete buttons start disabled</span></label></li><li><label><input type="checkbox" data-id="c6-4"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#7</b><code>feat(ui): load and display tasks from the database</code><span>0 / 4</span></header><ul><li><label><input type="checkbox" data-id="c7-1"><span>Added <code>_current_status()</code>, <code>_show_db_error()</code> and <code>refresh()</code>, and called <code>refresh()</code> from <code>__init__</code></span></label></li><li><label><input type="checkbox" data-id="c7-2"><span>Inserted a few rows by hand and they show up in the table</span></label></li><li><label><input type="checkbox" data-id="c7-3"><span>Status bar says how many tasks are shown</span></label></li><li><label><input type="checkbox" data-id="c7-4"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#8</b><code>feat(ui): add-task dialog (Create)</code><span>0 / 5</span></header><ul><li><label><input type="checkbox" data-id="c8-1"><span>Typed <code>ui/task_dialog.py</code> completely</span></label></li><li><label><input type="checkbox" data-id="c8-2"><span>Added the <code>TaskDialog</code> import, <code>add_task()</code> and <code>_connect_signals()</code></span></label></li><li><label><input type="checkbox" data-id="c8-3"><span>Adding a task with an empty title shows a warning and keeps the dialog open</span></label></li><li><label><input type="checkbox" data-id="c8-4"><span>A valid task appears in the table immediately</span></label></li><li><label><input type="checkbox" data-id="c8-5"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#9</b><code>feat(ui): edit a task (Update)</code><span>0 / 5</span></header><ul><li><label><input type="checkbox" data-id="c9-1"><span>Added <code>_selected_id()</code>, <code>_update_buttons()</code> and <code>edit_task()</code></span></label></li><li><label><input type="checkbox" data-id="c9-2"><span>Edit and Delete enable only when a row is selected</span></label></li><li><label><input type="checkbox" data-id="c9-3"><span>Double-clicking a row opens the dialog pre-filled</span></label></li><li><label><input type="checkbox" data-id="c9-4"><span>Saved changes show up in the table</span></label></li><li><label><input type="checkbox" data-id="c9-5"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#10</b><code>feat(ui): delete with confirmation</code><span>0 / 3</span></header><ul><li><label><input type="checkbox" data-id="c10-1"><span>Added <code>delete_task()</code> with a Yes/No confirmation (default: No)</span></label></li><li><label><input type="checkbox" data-id="c10-2"><span>Choosing No keeps the task; choosing Yes removes it</span></label></li><li><label><input type="checkbox" data-id="c10-3"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#11</b><code>feat(ui): search box and status filter</code><span>0 / 4</span></header><ul><li><label><input type="checkbox" data-id="c11-1"><span>Search box filters while typing</span></label></li><li><label><input type="checkbox" data-id="c11-2"><span>Status drop-down filters; both work together</span></label></li><li><label><input type="checkbox" data-id="c11-3"><span>Can explain what happens to the extra value a signal sends (<code>textChanged</code> sends the text)</span></label></li><li><label><input type="checkbox" data-id="c11-4"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#12</b><code>style: QSS theme and polish, status-bar messages</code><span>0 / 3</span></header><ul><li><label><input type="checkbox" data-id="c12-1"><span>Typed <code>ui/styles.py</code> and applied it in <code>main.py</code></span></label></li><li><label><input type="checkbox" data-id="c12-2"><span>Window looks consistent (buttons, table, dialog)</span></label></li><li><label><input type="checkbox" data-id="c12-3"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#13</b><code>test: repository and validation tests</code><span>0 / 4</span></header><ul><li><label><input type="checkbox" data-id="c13-1"><span>Added <code>pytest.ini</code>, <code>tests/test_task_repo.py</code> and <code>pytest</code> in <code>requirements.txt</code></span></label></li><li><label><input type="checkbox" data-id="c13-2"><span><code>pytest</code> is green (12 passed)</span></label></li><li><label><input type="checkbox" data-id="c13-3"><span>Broke something on purpose, saw a test fail, then fixed it</span></label></li><li><label><input type="checkbox" data-id="c13-4"><span>Committed</span></label></li></ul></div>
+<div class="cl-group"><header><b>#14</b><code>docs: README with run instructions</code><span>0 / 4</span></header><ul><li><label><input type="checkbox" data-id="c14-1"><span>README explains setup, run, test and the folder layout</span></label></li><li><label><input type="checkbox" data-id="c14-2"><span><code>git log --oneline</code> shows 14 clean commits</span></label></li><li><label><input type="checkbox" data-id="c14-3"><span>Ran the self-review list in the Review section</span></label></li><li><label><input type="checkbox" data-id="c14-4"><span>Sent the repo to me for review</span></label></li></ul></div>
+
+<h2 id="debugging">Debugging cheat sheet</h2>
+<p>Rule one of debugging: <strong>read the last line of the traceback first</strong>, then the line number in <em>your</em> file just above it.</p>
+<div class="table-wrap"><table>
+  <tr><th>Message</th><th>Usual cause</th><th>Fix</th></tr>
+  <tr><td><code>ModuleNotFoundError: No module named 'config'</code> (or <code>db</code>, <code>ui</code>)</td><td>Running from the wrong folder, or a missing <code>__init__.py</code></td><td>Run commands from <code>todo_app/</code>; start the app with <code>python main.py</code></td></tr>
+  <tr><td><code>sqlite3.OperationalError: no such table: tasks</code></td><td><code>init_db()</code> not called, or a different <code>todo.db</code> than you think</td><td>Call <code>init_db()</code> in <code>main()</code>; check where the file is</td></tr>
+  <tr><td><code>sqlite3.OperationalError: near "..." syntax error</code></td><td>Typo in the SQL string, often a stray comma or missing space</td><td>Print the SQL; the error is just before the quoted token</td></tr>
+  <tr><td><code>sqlite3.ProgrammingError: Incorrect number of bindings</code></td><td><code>?</code> count differs from the tuple length, or <code>(x)</code> instead of <code>(x,)</code></td><td>Count the marks; add the trailing comma</td></tr>
+  <tr><td><code>AttributeError: ... has no attribute 'AlignLeft'</code> / <code>'Yes'</code> / <code>'Save'</code> ...</td><td>PyQt5-style short enum names</td><td>Use the long form: <code>Qt.AlignmentFlag.AlignLeft</code>, <code>QMessageBox.StandardButton.Yes</code></td></tr>
+  <tr><td><code>AttributeError: 'MainWindow' object has no attribute 'table'</code></td><td>Using a widget before <code>_build_ui()</code> created it</td><td>Check the order of calls in <code>__init__</code></td></tr>
+  <tr><td><code>RuntimeError: ... __init__() of type ... was never called</code></td><td>Missing <code>super().__init__()</code></td><td>Make it the first line of your <code>__init__</code></td></tr>
+  <tr><td>Window flashes and closes immediately</td><td>No <code>app.exec()</code>, or <code>exec_()</code></td><td>End <code>main()</code> with <code>sys.exit(app.exec())</code></td></tr>
+  <tr><td>A widget does not appear</td><td>Never added to a layout, or the layout never attached to a widget</td><td><code>layout.addWidget(w)</code>; <code>QVBoxLayout(parent_widget)</code></td></tr>
+  <tr><td>Clicking a button does nothing</td><td>Not connected, or connected with brackets (<code>self.f()</code>)</td><td>Check <code>_connect_signals</code>; pass <code>self.f</code> without brackets</td></tr>
+  <tr><td>Styles ignored</td><td>QSS syntax error (fails silently)</td><td>Read the console for <em>Could not parse stylesheet</em>; check <code>;</code> and <code>}</code></td></tr>
+  <tr><td>Table stale after a change</td><td>Forgot <code>self.refresh()</code> after the repo call</td><td>Every handler ends with <code>refresh()</code></td></tr>
+  <tr><td>Tests import fine alone but fail under <code>pytest</code></td><td><code>pytest.ini</code> missing</td><td>Add <code>pythonpath = .</code> in the project root</td></tr>
+</table></div>
+
+<h3>A debugging routine that always works</h3>
+<ol>
+  <li><strong>Reproduce</strong> it the same way twice.</li>
+  <li><strong>Read</strong> the last line of the error, then the nearest line number in your own file.</li>
+  <li><strong>Shrink</strong> the problem: can you reproduce it with a one-line <code>python -c</code> against the repository, with no window at all?</li>
+  <li><strong>Print</strong> the values (<code>print(repr(x))</code>), do not assume them. Then delete the prints.</li>
+  <li><strong>Change one thing at a time</strong>, and run again.</li>
+</ol>
+
+<h2 id="stretch">Stretch goals</h2>
+<p>Only after all 14 commits are done and the tests are green. Each should be its own commit (or two), with a test where it makes sense.</p>
+<div class="table-wrap"><table>
+  <tr><th>Level</th><th>Goal</th><th>What it teaches</th></tr>
+  <tr><td><span class="score">Easy</span></td><td>Press <kbd>Delete</kbd> to delete and <kbd>Ctrl</kbd>+<kbd>N</kbd> to add (<code>QShortcut</code>)</td><td>Keyboard-first UX</td></tr>
+  <tr><td><span class="score">Easy</span></td><td>Colour overdue tasks red in the table</td><td>Comparing dates, <code>setForeground</code></td></tr>
+  <tr><td><span class="score">Easy</span></td><td>Move the repeated colours in <code>styles.py</code> into named constants</td><td>DRY, f-strings in QSS</td></tr>
+  <tr><td><span class="score">Medium</span></td><td>Click a column header to sort</td><td>Qt sorting vs SQL <code>ORDER BY</code>; trade-offs</td></tr>
+  <tr><td><span class="score">Medium</span></td><td>&ldquo;Mark done&rdquo; button / toggle without opening the dialog</td><td>A new repo function plus its test</td></tr>
+  <tr><td><span class="score">Medium</span></td><td>Export the visible tasks to CSV</td><td>The <code>csv</code> module, file dialogs (<code>QFileDialog</code>)</td></tr>
+  <tr><td><span class="score">Medium</span></td><td>Debounce the search with a <code>QTimer</code> (300 ms)</td><td>Timers, avoiding wasted work</td></tr>
+  <tr><td><span class="score">Hard</span></td><td>Soft delete with an Undo toast (<code>deleted_at</code> column)</td><td>Schema migration, safer destructive actions</td></tr>
+  <tr><td><span class="score">Hard</span></td><td>A <code>schema_version</code> table and a tiny migration runner</td><td>How real apps evolve their database</td></tr>
+  <tr><td><span class="score">Hard</span></td><td>Add Categories (a second table with a foreign key) and a category filter</td><td>Relationships, <code>JOIN</code>, <code>PRAGMA foreign_keys</code></td></tr>
+  <tr><td><span class="score">Hard</span></td><td>Package it as a single executable with PyInstaller</td><td>Shipping software</td></tr>
+</table></div>
+
+<h2 id="review">Review: how I will give you feedback</h2>
+<p>When you have finished, I review your work properly. Here is exactly what I will look at, so nothing is a surprise.</p>
+
+<h3>Before you send it: your self-review</h3>
+<p>Run through this honestly. Every &ldquo;no&rdquo; is something I would have found anyway, and it is better that <em>you</em> find it.</p>
+<ul>
+  <li>No SQL anywhere in <code>ui/</code>. No PyQt6 import anywhere in <code>db/</code> or <code>models/</code>.</li>
+  <li>Every query uses <code>?</code> placeholders. No f-string builds an SQL <em>value</em>.</li>
+  <li>No bare <code>except:</code>. Every <code>except</code> names what it catches.</li>
+  <li>No <code>print()</code> debugging and no commented-out code left behind.</li>
+  <li>Names say what things are (<code>task_id</code>, not <code>x</code>).</li>
+  <li><code>pytest</code> is green from a fresh clone.</li>
+  <li>The README steps work for someone who has never seen the project.</li>
+  <li>Pick two random commits, check them out, and run <code>python main.py</code>. Does each one start? (Return with <code>git checkout main</code>, or <code>master</code>.)</li>
+</ul>
+
+<h3>What to send me</h3>
+<ol>
+  <li>The repository (a link, or a zip <em>without</em> <code>.venv</code>).</li>
+  <li>Two screenshots: the main window with a few tasks, and the dialog.</li>
+  <li>Three or four sentences: what was hardest, what you would do differently, and one thing you now understand that you did not before.</li>
+</ol>
+
+<h3>What I will do with it</h3>
+<ol>
+  <li><strong>Run the app from a fresh clone</strong>, following only your README.</li>
+  <li><strong>Try to break it:</strong> an empty title, a title of exactly 100 and 101 characters, quotes and <code>'; DROP TABLE</code> in every field, a very long description, emoji, searching while a filter is on, deleting while filtered, double-clicking empty space, deleting <code>todo.db</code> while the app is closed.</li>
+  <li><strong>Run the automated checks:</strong> <code>pytest</code>, and a few searches such as <code>execute(f</code>, <code>sqlite3</code> inside <code>ui/</code>, and <code>PyQt6</code> inside <code>db/</code> and <code>models/</code>.</li>
+  <li><strong>Read the code</strong> top-down, starting at <code>main.py</code>, the way a teammate would on their first day.</li>
+  <li><strong>Read <code>git log</code></strong> as a story.</li>
+</ol>
+
+<h3>The rubric</h3>
+<div class="table-wrap"><table>
+  <tr><th>Area</th><th>Points</th><th>What &ldquo;full marks&rdquo; looks like</th></tr>
+  <tr><td>Architecture and layering</td><td class="score">20</td><td>Each folder has one job. Imports only point down. UI never touches SQL; the model never knows about Qt or SQLite.</td></tr>
+  <tr><td>Database and SQL safety</td><td class="score">20</td><td>Parameterised queries everywhere, <code>WHERE</code> on every update and delete, connections always closed, sensible schema constraints.</td></tr>
+  <tr><td>CRUD correctness</td><td class="score">20</td><td>All four operations plus search and filter work, survive a restart, and the screen always matches the database.</td></tr>
+  <tr><td>Code quality and readability</td><td class="score">15</td><td>Clear names, small functions, no duplication, no dead code, helpful (not noisy) comments and docstrings.</td></tr>
+  <tr><td>Validation and error handling</td><td class="score">10</td><td>Bad input is rejected politely, the database errors are caught and explained, nothing crashes with a traceback in front of a user.</td></tr>
+  <tr><td>Git history</td><td class="score">10</td><td>Small, runnable commits with the agreed messages. No &ldquo;fix&rdquo;, &ldquo;stuff&rdquo; or &ldquo;final_v2&rdquo; commits.</td></tr>
+  <tr><td>Tests and README</td><td class="score">5</td><td>Tests pass and test behaviour. README gets a stranger running in two minutes.</td></tr>
+</table></div>
+
+<div class="table-wrap"><table>
+  <tr><th>Total</th><th>What it means</th></tr>
+  <tr><td class="score">90 &ndash; 100</td><td>Ready for real tickets. We move on to the next, harder project.</td></tr>
+  <tr><td class="score">75 &ndash; 89</td><td>Solid. A few habits to tighten, which I will name specifically.</td></tr>
+  <tr><td class="score">60 &ndash; 74</td><td>It works but is fragile. You will redo two or three specific steps and resubmit.</td></tr>
+  <tr><td class="score">Below 60</td><td>We sit down together and rebuild the weakest layer step by step. That is not a failure, it is what this exercise is for.</td></tr>
+</table></div>
+
+<h3>What my feedback will look like</h3>
+<p>Always the same three parts, so you know where to look:</p>
+<div class="two">
+  <div class="card"><h4>1. What you did well</h4><p>Specific, with file and line. &ldquo;Your <code>_row_to_task</code> keeps every column mapping in one place&hellip;&rdquo;</p></div>
+  <div class="card"><h4>2. Must fix</h4><p>Things that are wrong or unsafe, ranked, each with <em>why</em> it matters and where to look, but not the answer typed out for you.</p></div>
+</div>
+<div class="card" style="margin-top:14px"><h4>3. Level up</h4><p>Three concrete next-level tasks chosen from your weakest rubric areas, plus one stretch goal that fits what you enjoyed.</p></div>
+
+<div class="callout why"><span class="t">Last word from your senior</span>
+<p>The goal was never a todo app. It was to make sure that when you open a 300-file codebase at work, you can see <em>where things live and why</em>, because you once built all of it yourself. Type slowly, read your errors, commit often. I will see you at the review.</p></div>
+
+    <footer>
+      Written by your senior engineer. Every code block in this guide was run and tested before it was put here, so if your code differs from mine and breaks, the bug is in your typing, and finding it is the lesson.
+    </footer>
+  </main>
+</div>
+<script>
+(function () {
+  var KEY = "pycrud-hard-lean:checklist:v1";
+  var THEME_KEY = "pycrud-hard-lean:theme";
+
+  function load(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked: page still works */ } }
+
+  // ---- theme toggle ------------------------------------------------------
+  var root = document.documentElement;
+  var savedTheme = load(THEME_KEY);
+  if (savedTheme === "light" || savedTheme === "dark") root.setAttribute("data-theme", savedTheme);
+  var themeBtn = document.getElementById("theme-btn");
+  if (themeBtn) themeBtn.addEventListener("click", function () {
+    var isDark = root.getAttribute("data-theme") === "dark" ||
+      (!root.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var next = isDark ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    save(THEME_KEY, next);
+  });
+
+  // ---- checklist ---------------------------------------------------------
+  var boxes = Array.prototype.slice.call(document.querySelectorAll(".cl-group input[type=checkbox]"));
+  var state = load(KEY) || {};
+
+  function refresh() {
+    var done = 0;
+    boxes.forEach(function (b) { if (b.checked) done++; });
+    document.querySelectorAll(".cl-group").forEach(function (g) {
+      var all = g.querySelectorAll("input[type=checkbox]");
+      var on = g.querySelectorAll("input[type=checkbox]:checked");
+      g.classList.toggle("done", all.length > 0 && all.length === on.length);
+      var counter = g.querySelector("header span");
+      if (counter) counter.textContent = on.length + " / " + all.length;
+    });
+    var pct = boxes.length ? Math.round((done / boxes.length) * 100) : 0;
+    document.querySelectorAll(".js-bar").forEach(function (el) { el.style.width = pct + "%"; });
+    document.querySelectorAll(".js-pct").forEach(function (el) { el.textContent = done + " of " + boxes.length + " tasks (" + pct + "%)"; });
+  }
+
+  boxes.forEach(function (b) {
+    b.checked = !!state[b.dataset.id];
+    b.addEventListener("change", function () {
+      state[b.dataset.id] = b.checked;
+      save(KEY, state);
+      refresh();
+    });
+  });
+  var reset = document.getElementById("reset-checklist");
+  if (reset) reset.addEventListener("click", function () {
+    if (!confirm("Untick everything?")) return;
+    state = {}; save(KEY, state);
+    boxes.forEach(function (b) { b.checked = false; });
+    refresh();
+  });
+  refresh();
+
+  // ---- highlight current section in the sidebar --------------------------
+  var links = Array.prototype.slice.call(document.querySelectorAll(".sidebar nav a"));
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute("href").slice(1)] = a; });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting && map[e.target.id]) {
+          links.forEach(function (l) { l.classList.remove("active"); });
+          map[e.target.id].classList.add("active");
+        }
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    document.querySelectorAll("main [id]").forEach(function (el) { if (map[el.id]) io.observe(el); });
+  }
+
+  // close the mobile menu after picking a section
+  document.querySelectorAll(".toc-mobile a").forEach(function (a) {
+    a.addEventListener("click", function () { var d = a.closest("details"); if (d) d.removeAttribute("open"); });
+  });
+})();
+
+</script>
+</body>
+</html>
